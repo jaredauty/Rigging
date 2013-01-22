@@ -261,10 +261,12 @@ def getCVs (_controlName):
 #(second variable)
 
 def orientControl (_controlName, _jointName):
+    # get parent 
+    parentObject = cmds.listRelatives(_controlName, p=1)
     cmds.parent(_controlName, _jointName)
     cmds.rotate(0,0,0, _controlName, absolute = True, os = True)
     cmds.move(0,0,0, _controlName, absolute = True, os = True)
-    cmds.parent(_jointName+"|"+_controlName, world=True)
+    cmds.parent(_jointName+"|"+_controlName, parentObject)
     
 #a method to change the extension of the name
 #for the inputted extension
