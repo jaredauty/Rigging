@@ -266,7 +266,10 @@ def orientControl (_controlName, _jointName):
     cmds.parent(_controlName, _jointName)
     cmds.rotate(0,0,0, _controlName, absolute = True, os = True)
     cmds.move(0,0,0, _controlName, absolute = True, os = True)
-    cmds.parent(_jointName+"|"+_controlName, parentObject)
+    if parentObject:
+        cmds.parent(_jointName+"|"+_controlName, parentObject)
+    else:
+        cmds.parent(_jointName+"|"+_controlName, world=True)
     
 #a method to change the extension of the name
 #for the inputted extension

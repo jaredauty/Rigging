@@ -43,10 +43,42 @@ class ArmRig:
         self.m_blendControl = _blendControl
         self.m_isMirrored = self.checkMirroring()
         if not self.m_blendControl:
-            self.m_blendControl = cmds.circle(n=self.m_name+"_IKFKBlend_CTRL")
-            self.m_blendControl = self.m_blendControl[0]
+            self.m_blendControl = cmds.circle(n=self.m_name+"_IKFKBlend_CTRL")[0]
             cmds.parent(self.m_blendControl, self.m_group)		
         self.m_isGenerated = False
+        # stretch chain parameters
+        self.m_numUpperControls = 2
+        self.m_numLowerControls = 2
+        self.m_numUpperJoints = 5
+        self.m_numLowerJoints = 5
+        self.m_upperStretchJoints = False
+        self.m_lowerStretchJoints = False
+
+    def setUpperStretchChain(
+            self,
+            _numControls,
+            _joints,
+            _numJoints
+            ):
+        self.m_numUpperControls = _numControls
+        if _joints:
+            self.m_upperStretchJoints = _joints
+            self.m_numUpperJoints = len(_joints)
+        else:
+            self.m_numUpperJoints = _numJoints
+
+    def setLowerStretchChain(
+            self,
+            _numControls,
+            _joints,
+            _numJoints
+            ):
+        self.m_numLowerControls = _numControls
+        if _joints:
+            self.m_lowerStretchJoints = _joints
+            self.m_numLowerJoints = len(_joints)
+        else:
+            self.m_numLowerJoints = _numJoints
 
     def getVisibilityAttrs(self):
         assert self.m_isGenerated, "Rig hasn't been generated"
@@ -125,6 +157,12 @@ class ArmRig:
             tmpList, 
             self.m_name+"_BIND",
             self.m_blendControl,
+            self.m_numUpperControls,
+            self.m_numLowerControls,
+            self.m_numUpperJoints,
+            self.m_numLowerJoints,
+            self.m_upperStretchJoints,
+            self.m_lowerStretchJoints,
             self.m_isMirrored,
             self.m_twistAxis,
             self.m_rigWrist

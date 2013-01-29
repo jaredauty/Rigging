@@ -16,9 +16,15 @@ class BINDArmRig:
             _joints,
             _name,
             _controlObject,
+            _numUpperControls,
+            _numLowerControls,
+            _numUpperJoints,
+            _numLowerJoints,
+            _upperStretchJoint,
+            _lowerStretchJoint,
             _isMirrored=False,
             _twistAxis = "y",
-            _rigWrist = True
+            _rigWrist = True,
             ):
         self.m_isMirrored = _isMirrored
         self.m_joints = aj.ArmJoints(_joints)
@@ -36,6 +42,14 @@ class BINDArmRig:
             "%s_0" %(self.m_joints.m_shoulder)
             )
         self.m_isGenerated = False
+
+        # stretch chain parameters
+        self.m_numUpperControls = _numUpperControls
+        self.m_numLowerControls = _numLowerControls
+        self.m_numUpperJoints = _numUpperJoints
+        self.m_numLowerJoints = _numLowerJoints
+        self.m_upperStretchJoints = _upperStretchJoint
+        self.m_lowerStretchJoints = _lowerStretchJoint
         
     def generate(self):
         cmds.cycleCheck(e=False)
@@ -84,6 +98,31 @@ class BINDArmRig:
             self.m_joints.m_wrist, 
             mo=True
             )
+        # Move and parent blend control
+        rc.orientControl(self.m_controlObject, self.m_wristCtrl)
+        group = rg.addGroup(self.m_controlObject, "%s_0" %(self.m_controlObject))
+        moveValue = -2
+        if self.m_isMirrored:
+            moveValue *= -1
+        cmds.setAttr("%s.t%s" %(self.m_controlObject, self.m_twistAxis), moveValue)
+        cmds.parentConstraint(self.m_wristCtrl, group, mo=1)
+        rc.lockAttrs(
+            self.m_controlObject, 
+            [
+                "tx", 
+                "ty",
+                "tz", 
+                "rx", 
+                "ry", 
+                "rz", 
+                "sx", 
+                "sy", 
+                "sz", 
+                "visibility"
+            ],
+            True,
+            True
+            )
         
     def setupStretch(self):
        #Create the bendy bits 
@@ -91,8 +130,8 @@ class BINDArmRig:
             self.m_joints.m_shoulder, 
             self.m_joints.m_elbow1, 
             self.m_name+"_upperStretch", 
-            2, 
-            6
+            self.m_numLowerControls, 
+            self.m_numUpperJoints
             )
         self.m_upperStretch.setMirroring(self.m_isMirrored)
         self.m_upperStretch.setBendFromParent(False)
@@ -100,23 +139,27 @@ class BINDArmRig:
         self.m_upperStretch.setBlendAttrName("upperBend") 
         self.m_upperStretch.setSquetchAttrName("upperSquetchiness")
         self.m_upperStretch.setSquetchBoolAttrName("upperSquetchOnOff")
+        self.m_upperStretch.setAttrHeading("UPPER")
         self.m_upperStretch.setTwistAxis(self.m_twistAxis)
+        self.m_upperStretch.setBindJoints(self.m_upperStretchJoints)
         self.m_upperArmGRP = self.m_upperStretch.generate()
         cmds.parent(self.m_upperArmGRP, self.m_group)
  
         self.m_lowerStretch = chain.StretchChain(
             self.m_joints.m_elbow2, 
             self.m_joints.m_wrist, 
-            self.m_name+"_lowerStretch", 
-            2, 
-            6
+            self.m_name+"_lowerStretch",
+            self.m_numLowerControls, 
+            self.m_numLowerJoints
             )
         self.m_lowerStretch.setMirroring(self.m_isMirrored)
         self.m_lowerStretch.setBlendControl(self.m_controlObject)
         self.m_lowerStretch.setBlendAttrName("lowerBend")
         self.m_lowerStretch.setSquetchAttrName("lowerSquetchiness")
         self.m_lowerStretch.setSquetchBoolAttrName("lowerSquetchOnOff")
+        self.m_lowerStretch.setAttrHeading("LOWER")
         self.m_lowerStretch.setTwistAxis(self.m_twistAxis)
+        self.m_lowerStretch.setBindJoints(self.m_lowerStretchJoints)
         self.m_lowerArmGRP = self.m_lowerStretch.generate()
         cmds.parent(self.m_lowerArmGRP, self.m_group)
         # parent lower twist

@@ -22,9 +22,11 @@ class StretchChain:
         self.m_blendAttrName = "autoBend"
         self.m_squetchAttrName = "squetchiness"
         self.m_squetchBoolAttrName = "squetchOnOff"
+        self.m_attrHeading = "Heading"
         self.m_isMirrored = False
         self.m_twistAxis = "y"
         self.m_userJoints = False
+        self.m_isAutoBend = True
         
         #create null for scale fixing
         self.m_scaleNull = cmds.group(em=1, n=_name+"_NULL", w=True)
@@ -45,6 +47,9 @@ class StretchChain:
                 break
         assert flag, "Trying to set invalid twist axis, use 'x', 'y' or 'z'"
         self.m_twistAxis = _axis
+
+    def setAutoBend(self, _isAutoBend):
+        self.m_isAutoBend = _isAutoBend
 
     def getTwistAxis(self):
         return self.m_twistAxis
@@ -70,6 +75,9 @@ class StretchChain:
     def setSquetchBoolAttrName(self, _squetchBoolAttrName):
         self.m_squetchBoolAttrName = _squetchBoolAttrName
 
+    def setAttrHeading(self, _attrHeading):
+        self.m_attrHeading = _attrHeading
+
     def getTwistControls(self):
         return [self.m_twistControl1, self.m_twistControl2]
 
@@ -81,6 +89,7 @@ class StretchChain:
         self.createControls()
         self.createIK()
         self.createTwist()
+        self.fixControlAims()
         return self.m_group
     
     def createJoints(self):
@@ -122,19 +131,28 @@ class StretchChain:
     def createControls(self):
         #If no blend control is speified add one
         if not self.m_blendControl:
-            self.m_blendControl = cmds.circle(n=self.m_name+"Blend_CTRL")
-            self.m_blendControl = self.m_blendControl[0]
+            self.m_blendControl = cmds.circle(n=self.m_name+"Blend_CTRL")[0]
             cmds.parent(self.m_blendControl, self.m_group)
+
         cmds.addAttr(
-            self.m_blendControl, 
-            ln=self.m_blendAttrName, 
-            k=1, min=0, max=1, dv=0
+            self.m_blendControl,
+            ln=self.m_attrHeading,
+            k=True,
+            at = "enum",
+            en = "---------:"
             )
-        blendNodeAttr = self.m_blendControl+"."+self.m_blendAttrName
-        oppBlendNodeAttr = rc.create1MinusNode(
-            blendNodeAttr, 
-            self.m_name+"OppBlend_CTRL" 
-            )
+
+        if self.m_isAutoBend:
+            cmds.addAttr(
+                self.m_blendControl, 
+                ln=self.m_blendAttrName, 
+                k=1, min=0, max=1, dv=0
+                )
+            blendNodeAttr = self.m_blendControl+"."+self.m_blendAttrName
+            oppBlendNodeAttr = rc.create1MinusNode(
+                blendNodeAttr, 
+                self.m_name+"OppBlend_CTRL" 
+                )
         
         self.m_controls = []
         self.m_parentCtrls = []
@@ -151,57 +169,65 @@ class StretchChain:
             parentCtrl = self.m_name+"_"+str(i)+"_parent_CTRL"
             pointCtrl = self.m_name+"_"+str(i)+"_point_CTRL"
             
-            newCtrl = cmds.spaceLocator(n=newCtrl)
-            newCtrl = newCtrl[0]
+            newCtrl = cmds.spaceLocator(n=newCtrl)[0]
+            self.m_controls.append(newCtrl)
             cmds.parent(newCtrl, self.m_group)
             cmds.xform(newCtrl, t=currentPos, ws=1)
+            newCtrlGroups = rg.add3Groups(newCtrl, ["_SDK", "_CONST", "_0"])
             
-            parentCtrl = cmds.duplicate(newCtrl, n=parentCtrl)
-            parentCtrl = parentCtrl[0]
-            cmds.setAttr(parentCtrl+".visibility", 0)
-            pointCtrl = cmds.duplicate(newCtrl, n=pointCtrl)
-            pointCtrl = pointCtrl[0]
-            cmds.setAttr(pointCtrl+".visibility", 0)
+            if self.m_isAutoBend:
+                parentCtrl = cmds.duplicate(newCtrl, n=parentCtrl)[0]
+                print parentCtrl, newCtrlGroups[2]
+                cmds.parent(parentCtrl, newCtrlGroups[2])
+                cmds.setAttr(parentCtrl+".visibility", 0)
+                pointCtrl = cmds.duplicate(newCtrl, n=pointCtrl)[0]
+                cmds.parent(pointCtrl, newCtrlGroups[2])
+                cmds.setAttr(pointCtrl+".visibility", 0)
 
-            rg.add3Groups(newCtrl, ["_SDK", "_CONST", "_0"])
-            
-            #Create blend between parent and point setups
-            blendConst = cmds.pointConstraint(parentCtrl, newCtrl+"_CONST")
-            cmds.connectAttr(blendNodeAttr, blendConst[0]+"."+parentCtrl+"W0")
-            blendConst = cmds.pointConstraint(pointCtrl, newCtrl+"_CONST")
-            cmds.connectAttr(oppBlendNodeAttr, blendConst[0]+"."+pointCtrl+"W1")
-            
-            self.m_controls.append(newCtrl)
-            self.m_parentCtrls.append(parentCtrl)
-            self.m_pointCtrls.append(pointCtrl)
+                #Create blend between parent and point setups
+                blendConst = cmds.pointConstraint(parentCtrl, newCtrlGroups[1])
+                cmds.connectAttr(blendNodeAttr, blendConst[0]+"."+parentCtrl+"W0")
+                blendConst = cmds.pointConstraint(pointCtrl, newCtrlGroups[1])
+                cmds.connectAttr(oppBlendNodeAttr, blendConst[0]+"."+pointCtrl+"W1")
+                
+                
+                self.m_parentCtrls.append(parentCtrl)
+                self.m_pointCtrls.append(pointCtrl)
+                
+                grandParent = cmds.listRelatives(self.m_parent1, p=1)
+                if grandParent == None or not self.m_isParentBend:
+                    grandParent = self.m_parent1
+                
+                parentConst = rc.applyWeightedConstraint(
+                    grandParent, 
+                    parentCtrl, 
+                    self.m_parent2, 
+                    cmds.parentConstraint
+                    )
+                pointConst = rc.applyWeightedConstraint(
+                    self.m_parent1, 
+                    pointCtrl, 
+                    self.m_parent2, 
+                    cmds.pointConstraint
+                    )
+            cmds.aimConstraint(
+                    self.m_parent2,
+                    newCtrlGroups[1]
+                    )
             currentPos = vec.add(currentPos, stepVec)
-
-            grandParent = cmds.listRelatives(self.m_parent1, p=1)
-            if grandParent == None or not self.m_isParentBend:
-                grandParent = self.m_parent1
-            
-            parentConst = rc.applyWeightedConstraint(
-                grandParent, 
-                parentCtrl, 
-                self.m_parent2, 
-                cmds.parentConstraint
-                )
-            pointConst = rc.applyWeightedConstraint(
-                self.m_parent1, 
-                pointCtrl, 
-                self.m_parent2, 
-                cmds.pointConstraint
-                )
             #lock attrs
             cmds.setAttr(newCtrl+".rotate", l=1)
             cmds.setAttr(newCtrl+".scale", l=1)
             
     def createIK(self):
+        numCVs = self.m_numCtrls - 1
+        if self.m_numCtrls == 1:
+            numCVs = 4
         ikResult = cmds.ikHandle(
            sol = "ikSplineSolver",
            sj=self.m_bindJoints[0], 
            ee=self.m_bindJoints[-1],
-           ns=self.m_numCtrls-1, 
+           ns=numCVs, 
            n = self.m_name + "_IK"
            )
         self.m_ikCurve = ikResult[2]
@@ -215,22 +241,59 @@ class StretchChain:
         self.m_clusters = []
         
         #Create clusters
-        for i in range(0, len(self.m_controls)):
-            name = self.m_controls[i][:self.m_controls[i].rfind("_")]+\
+        if len(self.m_controls) == 1:
+            name = self.m_parent1[:self.m_parent1.rfind("_")]+"_stretch_CLUSTER"
+            self.m_clusters.append(self.clusterPoint(
+                [
+                    self.m_ikCurve+".cv[0]",
+                    self.m_ikCurve+".cv[1]"
+                ],
+                self.m_parent1,
+                name,
+                cmds.pointConstraint,
+                self.m_parent2
+                ))
+            name = self.m_controls[0][:self.m_controls[0].rfind("_")]+\
                 "_stretch_CLUSTER"
-            self.clusterPoint(
-                self.m_ikCurve+".cv["+str(i+1)+"]", 
-                self.m_controls[i],
+            self.m_clusters.append(self.clusterPoint(
+                [
+                    self.m_ikCurve+".cv["+str(2)+"]",
+                    self.m_ikCurve+".cv["+str(3)+"]",
+                    self.m_ikCurve+".cv["+str(4)+"]"
+                ], 
+                self.m_controls[0],
                 name
-                )
-        name = self.m_parent1[:self.m_parent1.rfind("_")]+"_stretch_CLUSTER"
-        self.clusterPoint(self.m_ikCurve+".cv[0]", self.m_parent1, name)
-        name = self.m_parent2[:self.m_parent2.rfind("_")]+"_stretch_CLUSTER"
-        self.clusterPoint(
-            self.m_ikCurve+".cv["+str(self.m_numCtrls+2)+"]", 
-            self.m_parent2, 
-            name
-            )
+                ))
+            name = self.m_parent2[:self.m_parent2.rfind("_")]+"_stretch_CLUSTER"
+            self.m_clusters.append(self.clusterPoint(
+                [
+                    self.m_ikCurve+".cv["+str(5)+"]", 
+                    self.m_ikCurve+".cv["+str(6)+"]" 
+                ],
+                self.m_parent2, 
+                name,
+                cmds.pointConstraint,
+                self.m_parent1
+                ))
+        else:
+            name = self.m_parent1[:self.m_parent1.rfind("_")]+"_stretch_CLUSTER"
+            self.m_clusters.append(self.clusterPoint(self.m_ikCurve+".cv[0]", self.m_parent1, name))
+            for i in range(0, len(self.m_controls)):
+                name = self.m_controls[i][:self.m_controls[i].rfind("_")]+\
+                    "_stretch_CLUSTER"
+                self.m_clusters.append(self.clusterPoint(
+                    self.m_ikCurve+".cv["+str(i+1)+"]", 
+                    self.m_controls[i],
+                    name
+                    ))
+            name = self.m_parent2[:self.m_parent2.rfind("_")]+"_stretch_CLUSTER"
+            self.m_clusters.append(self.clusterPoint(
+                self.m_ikCurve+".cv["+str(self.m_numCtrls+2)+"]", 
+                self.m_parent2, 
+                name
+                ))
+        
+        
         
         #Do stretch
         self.m_curveInfo = cmds.createNode(
@@ -258,16 +321,6 @@ class StretchChain:
         cmds.connectAttr(scaleComp+".outputX", normaliseNode+".input1X")
         cmds.setAttr(normaliseNode+".input2X", self.m_numJoints-1)
         cmds.setAttr(normaliseNode+".operation", 2)
-        #Go through and connect up all the joints
-        # for jnt in self.m_bindJoints[1:]:
-        #     cmds.connectAttr(normaliseNode+".outputX", jnt+".tx")
-        #Make sure to rebuild the curve to make it all nice and smooth
-        # cmds.rebuildCurve(
-        #     self.m_ikCurve,
-        #     rebuildType=0,
-        #     spans=4,
-        #     keepRange=0
-        #     )
         # VOLUME RETENTION #
         #Create overall stretch node
         stretchAmount = cmds.createNode(
@@ -342,15 +395,21 @@ class StretchChain:
         self.m_twistControl1 = cmds.spaceLocator(
             n="%s_upperTwist_CTRL" %(self.m_name)
             )[0]
-        cmds.parent(self.m_twistControl1, self.m_parent1, r=1)
+        #cmds.parent(self.m_twistControl1, self.m_parent1, r=1)
         
         # Twist 2
         self.m_twistControl2 = cmds.spaceLocator(
             n="%s_lowerTwist_CTRL" %(self.m_name)
             )[0]
-        cmds.parent(self.m_twistControl2, self.m_parent2, r=1)
+        #cmds.parent(self.m_twistControl2, self.m_parent2, r=1)
 
-        for control in [self.m_twistControl1, self.m_twistControl2]: 
+        for control, parent in map(
+                                    None, 
+                                    [self.m_twistControl1, self.m_twistControl2],
+                                    [self.m_parent1, self.m_parent2]
+                                    ): 
+            rc.orientControl(control, parent)
+            group = rg.addGroup(control, "%s_0" %(control))
             if self.m_isMirrored:
                 cmds.setAttr(
                     "%s.t%s" %(control, self.m_twistAxis),
@@ -361,7 +420,8 @@ class StretchChain:
                     "%s.t%s" %(control, self.m_twistAxis),
                     -1
                     )
-            rg.addSingleGroup([control], "_0")
+            cmds.parentConstraint(parent, group, mo=1)
+            cmds.parent(group, self.m_group)
             rc.lockAttrs(
                 control,
                 ["rotate", "scale"],
@@ -395,12 +455,44 @@ class StretchChain:
             "%s.dWorldUpMatrixEnd" %(self.m_ikHandle),
             f = True
             )
+
+    def fixControlAims(self):
+        for control in self.m_controls:
+            cmds.aimConstraint(
+                    "%s_CONST" %(control),
+                    e=True,
+                    worldUpType="object",
+                    worldUpObject=self.m_twistControl1,
+                    mo=True
+                    )
+        if self.m_numCtrls == 1:
+            cmds.aimConstraint(
+                self.m_clusters[0],
+                #mo=True,
+                e=True,
+                worldUpType="object",
+                worldUpObject=self.m_twistControl1,
+                )
+            cmds.aimConstraint(
+                self.m_clusters[-1],
+                #mo=True,
+                e=True,
+                worldUpType="object",
+                worldUpObject=self.m_twistControl2,
+                )
         
-    def clusterPoint(self, _point, _control, _name):
+    def clusterPoint(self, _point, _control, _name, _constraint = cmds.parentConstraint, _aim = False):
         #pos = cmds.xform(_control, t=1, q=1, ws=1)
         #cmds.xform(_point, t=pos, ws=1)
         clusterResult = cmds.cluster(_point, n=_name)
         cmds.setAttr(clusterResult[1]+".visibility", 0)
-        cmds.parent(clusterResult[1], _control)
+        cmds.parent(clusterResult[1], self.m_group)
+        _constraint(_control, clusterResult[1], mo=1)
+        if _aim:
+            cmds.aimConstraint(
+                _aim,
+                clusterResult[1],
+                mo=True
+                )
         return clusterResult[1]
  
