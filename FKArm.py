@@ -9,7 +9,8 @@ reload(rg)
 reload(aj)
 
 class FKArmRig:
-    def __init__(self, _joints, _name):
+    def __init__(self, _sceneData, _joints, _name):
+        self.m_sceneData = _sceneData
         self.m_isShoulder = False
         self.m_isElbow = False
         self.m_isWrist = False
@@ -52,7 +53,8 @@ class FKArmRig:
                 True
                 )
            self.m_shoulderGBLCtrl = gimbalCtrls[0]
-           self.m_shoulderCtrl = gimbalCtrls[1]          
+           self.m_shoulderCtrl = gimbalCtrls[1]    
+           rc.addToLayer(self.m_sceneData, "mainCtrl", gimbalCtrls)      
            self.m_isShoulder = True
            cmds.parent(self.m_shoulderCtrl+"_0", self.m_group, r=1)
            cmds.pointConstraint(
@@ -130,6 +132,7 @@ class FKArmRig:
             self.m_elbowCtrl, 
             ["tx", "ty", "tz",  "sx",  "sy",  "sz"]
             )
+       rc.addToLayer(self.m_sceneData, "mainCtrl", [self.m_stretchCtrl, self.m_elbowCtrl])
        self.m_isElbow = True
 
 
@@ -166,6 +169,7 @@ class FKArmRig:
             True,
             False
             )
+       rc.addToLayer(self.m_sceneData, "mainCtrl", self.m_wristCtrl)
        self.m_isWrist = True
            
     # Strip everything between underscores number _front and _back

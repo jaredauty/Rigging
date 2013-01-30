@@ -8,7 +8,8 @@ reload(rg)
 
 class IKFootRig:
     def __init__(
-            self, 
+            self,
+            _sceneData, 
             _name,
             _joints,
             _toePivot,
@@ -18,6 +19,7 @@ class IKFootRig:
             _footMain,
             _ankleIK
             ):
+        self.m_sceneData = _sceneData
         self.m_name = _name
         self.m_group = cmds.group(n="%s_GRP" %(self.m_name), em=True)
         self.m_joints = _joints
@@ -53,11 +55,23 @@ class IKFootRig:
         self.m_toeFlap = cmds.spaceLocator(
             n="%s_toeFlap_CTRL" %(self.m_name)
             )[0]
-        
+        rc.addToLayer(
+            self.m_sceneData,
+            "detailCtrl",
+            [
+                self.m_heelRoll,
+                self.m_insideRoll,
+                self.m_outsideRoll,
+                self.m_toeRoll,
+                self.m_ballRoll,
+                self.m_toeFlap
+            ]
+            )
         self.m_mainCtrl = cmds.circle(
             n="%s_main_CTRL" %(self.m_name),
             nr=(1, 0, 0)
             )[0]
+        rc.addToLayer(self.m_sceneData, "mainCtrl", self.m_mainCtrl)
         rc.orientControl(self.m_mainCtrl, self.m_footMainLoc)
         cmds.parent(self.m_mainCtrl, self.m_group)
         mainCtrlGroups = rg.add3Groups(
@@ -104,6 +118,8 @@ class IKFootRig:
             sol="ikRPsolver"
             )[0]
         cmds.parent(self.m_toeIK, self.m_toeFlap)
+
+        rc.addToLayer(self.m_sceneData, "hidden", [self.m_footIK, self.m_toeIK])
 
         # Sort ankle
         cmds.parentConstraint(self.m_ballRoll, self.m_ankleIK, mo=True)

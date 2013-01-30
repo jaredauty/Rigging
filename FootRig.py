@@ -12,6 +12,7 @@ reload(rc)
 class FootRig:
     def __init__(
             self, 
+            _sceneData,
             _name, 
             _topJoint,
             _toePivot,
@@ -26,6 +27,7 @@ class FootRig:
             _blendControl = False,
             _blendAttr = "IK_FK_Blend"
             ):
+        self.m_sceneData = _sceneData
         self.m_name = _name
         self.m_group = cmds.group(n="%s_GRP" %(self.m_name), em=True)
         self.m_topJoint = _topJoint
@@ -66,7 +68,9 @@ class FootRig:
     def generate(self):
         # Create IK
         self.m_ikJoints = self.duplicateJoints(self.m_topJoint, "IK")
+        rc.addToLayer(self.m_sceneData, "ref", self.m_ikJoints[0])
         self.m_ikFoot = IKFoot.IKFootRig(
+            self.m_sceneData,
             "%s_IK" %(self.m_name),
             self.m_ikJoints,
             self.m_footToePivot,
@@ -81,7 +85,9 @@ class FootRig:
 
         # Create FK
         self.m_fkJoints = self.duplicateJoints(self.m_topJoint, "FK")
+        rc.addToLayer(self.m_sceneData, "ref", self.m_fkJoints[0])
         self.m_fkFoot = FKFoot.FKFootRig(
+            self.m_sceneData,
             "%s_FK" %(self.m_name),
             self.m_fkJoints,
             self.m_footMain,
@@ -95,6 +101,7 @@ class FootRig:
             self.m_topJoint,
             "BIND"
             )
+        rc.addToLayer(self.m_sceneData, "ref", self.m_bindJoints[0])
         bindGroups = rg.add3Groups(
             self.m_bindJoints[0],
             ["_SDK", "_CONST", "_0"]
@@ -104,7 +111,10 @@ class FootRig:
         # connect to parent
         cmds.parentConstraint(self.m_parentBIND, bindGroups[-1], mo=1)
         # connect to parent twist
-        print self.m_bindJoints[0], self.m_parentTwist
+        # Strip constraint
+        targetList = cmds.parentConstraint(self.m_parentTwist, q=1, tl=1)
+        cmds.parentConstraint(targetList, self.m_parentTwist, e=True, rm=True)
+        # Add new constraint
         cmds.parentConstraint(self.m_bindJoints[0], self.m_parentTwist, mo=1)
 
     def connectBind(self):

@@ -1,6 +1,10 @@
 import maya.cmds as cmds
 import math
 import RiggingGroups as rg
+import ErrorChecking as error
+import SceneData as sd
+reload(sd)
+reload(error)
 
 reload(rg)
 
@@ -216,7 +220,7 @@ def jointControl ():
     
     cmds.rename(circle1[0], "jointCTRL")
     
-def createLine(_parents):
+def createLine(_parents, _sceneData = False, _layer = False):
     nodes = []
     lineCurve = ""
     firstTime = True
@@ -237,8 +241,12 @@ def createLine(_parents):
         clusterName = _parents[j]+"_CLUSTER"
         clusterPoint = cmds.cluster(lineCurve+".cv["+str(j)+"]", n=clusterName)
         nodes.append(clusterPoint[1])
-        cmds.setAttr(clusterPoint[1]+".visibility", 0)
+        #cmds.setAttr(clusterPoint[1]+".visibility", 0)
         cmds.parent(clusterPoint[1], _parents[j], a=1)
+    if(_sceneData):
+        addToLayer(_sceneData, "hidden", nodes)
+        if _layer:
+            addToLayer(_sceneData, _layer, lineCurve)
     return nodes
 
 
@@ -420,4 +428,24 @@ def reorientJoints(_joints, _up=False, _upVec=(0, 0, 1),  _aimVec=(1, 0, 0)):
         if _up:
             # Clean rotations
             reorientRecursive(topJoint, _up, _upVec, _aimVec)
+
+def addToLayer(_data, _layer, _objects):
+    assert isinstance(_data, sd.SceneData), "_data must be SceneData object"
+    assert type(_layer) == type("") or type(_objects) == type(u''), "_layer must be a string"
+    if type(_objects) == type([]):
+        for obj in _objects:
+            assert type(obj) == type("")  or type(obj) == type(u''), "All objects must be strings"
+            cmds.editDisplayLayerMembers(_data.getLayer(_layer), obj)
+    else:
+        assert type(_objects) == type("") or type(_objects) == type(u''), "_objects must be a string"
+        cmds.editDisplayLayerMembers(_data.getLayer(_layer), _objects)
+
+def getJointChain(_topJoint):
+    error.assertType(_topJoint, ["", u''])
+    error.assertMayaType(_topJoint, "joint")
+    jointList = cmds.listRelatives(_topJoint, ad=True, type="joint")
+    jointList.append(_topJoint)
+    jointList.reverse()
+    return jointList
+
 

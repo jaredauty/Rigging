@@ -5,14 +5,17 @@ import RiggingControls as rc
 import RiggingGroups as rg
 import ArmJoints as aj
 import StretchChain as chain
+import ErrorChecking as error
 reload(chain)
 reload(rc)
 reload(rg)
 reload(aj)
+reload(error)
 
 class BINDArmRig:
     def __init__(
             self, 
+            _sceneData,
             _joints,
             _name,
             _controlObject,
@@ -26,6 +29,7 @@ class BINDArmRig:
             _twistAxis = "y",
             _rigWrist = True,
             ):
+        self.m_sceneData = _sceneData
         self.m_isMirrored = _isMirrored
         self.m_joints = aj.ArmJoints(_joints)
         self.m_name = _name
@@ -56,8 +60,8 @@ class BINDArmRig:
         if self.m_rigWrist:
             self.rigWrist()
         self.setupStretch()
-        if self.m_rigWrist:
-            self.aimWrist()
+        # if self.m_rigWrist:
+        #     self.aimWrist()
         cmds.cycleCheck(e=True)
         self.m_isGenerated = True
 
@@ -82,10 +86,15 @@ class BINDArmRig:
             self.m_lowerStretch.getTwistControls()
             ]
 
+    def getWristCtrl(self):
+        assert self.m_isGenerated, "Rig not generated"
+        return self.m_wristCtrl
+
     def rigWrist(self):
         gimbalCtrls = rc.makeGimbalCTRL(self.m_joints.m_wrist, False, False)
         self.m_wristCtrl = gimbalCtrls[1]
         self.m_wristGBLCtrl = gimbalCtrls[0]
+        rc.addToLayer(self.m_sceneData, "mainCtrl", gimbalCtrls)
         #Lock controls
         for control in [self.m_wristCtrl, self.m_wristGBLCtrl]:
             cmds.setAttr(control+".translate", l=1)
@@ -127,6 +136,7 @@ class BINDArmRig:
     def setupStretch(self):
        #Create the bendy bits 
         self.m_upperStretch = chain.StretchChain(
+            self.m_sceneData,
             self.m_joints.m_shoulder, 
             self.m_joints.m_elbow1, 
             self.m_name+"_upperStretch", 
@@ -146,6 +156,7 @@ class BINDArmRig:
         cmds.parent(self.m_upperArmGRP, self.m_group)
  
         self.m_lowerStretch = chain.StretchChain(
+            self.m_sceneData,
             self.m_joints.m_elbow2, 
             self.m_joints.m_wrist, 
             self.m_name+"_lowerStretch",
@@ -166,15 +177,49 @@ class BINDArmRig:
         twistControls = self.m_lowerStretch.getTwistControls()
         cmds.parent(twistControls[0], self.m_upperStretch.getTwistControls()[1])
         # Hide unused twist controls
-        for control in twistControls:
-            cmds.setAttr("%s.visibility" %(control), 0)
+        rc.addToLayer(self.m_sceneData, "hidden", twistControls)
+        # for control in twistControls:
+        #     cmds.setAttr("%s.visibility" %(control), 0)
 
-    def aimWrist(self): 
+    def aimWrist(self, _fkWrist, _blendControlAttrs):
+        error.assertType(_fkWrist, ["", u''])
+        error.assertList(_blendControlAttrs, ["", u''])
+        assert len(_blendControlAttrs) == 2, "_blendControls must contain two elements"
+        
+
         # Make sure wrist is aimed right
-        cmds.aimConstraint(
-            self.m_joints.m_elbow2,
-            "%s_CONST" %(self.m_wristCtrl),
-            worldUpType = "object",
-            worldUpObject = self.m_lowerStretch.getTwistControls()[0],
-            mo = True
-            )
+
+        # create fix control that always aims as fk should.
+        # this is used to help blend between ik and fk
+        if (self.m_rigWrist):
+            group = cmds.group(n="%s_wrist_blendFix_GRP" %(self.m_name), em=True)
+            cmds.parent(group, self.m_group)
+            rc.orientControl(group, self.m_wristCtrl)
+            cmds.pointConstraint(self.m_joints.m_wrist, group, mo=1)
+            aim = cmds.aimConstraint(
+                self.m_joints.m_elbow2,
+                group,
+                worldUpType = "object",
+                worldUpObject = self.m_lowerStretch.getTwistControls()[0],
+                mo = True
+                )[0]
+
+            orient = cmds.orientConstraint(
+                _fkWrist,
+                "%s_SDK" %(self.m_wristCtrl),
+                mo= True
+                )[0]
+            orient = cmds.orientConstraint(
+                group,
+                "%s_SDK" %(self.m_wristCtrl),
+                mo= True
+                )[0]
+            cmds.setAttr("%s.interpType" %(orient), 2)
+            cmds.connectAttr(
+                _blendControlAttrs[0],
+                "%s.%sW0" %(orient, _fkWrist)
+                )
+            cmds.connectAttr(
+                _blendControlAttrs[1],
+                "%s.%sW1" %(orient, group)
+                )

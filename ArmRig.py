@@ -20,12 +20,14 @@ reload(aj)
 class ArmRig:
     def __init__(
             self,
+            _sceneData,
             _joints,
             _name,
             _twistAxis="y",
             _rigWrist=True,
             _blendControl=False
             ):
+        self.m_sceneData = _sceneData
         self.m_startJoints = aj.ArmJoints(_joints)
         # Make sure to strip blendParent2 attribute otherwise ik fk blending
         # can break. This sometimes happens if joints are taken from a previous
@@ -44,7 +46,8 @@ class ArmRig:
         self.m_isMirrored = self.checkMirroring()
         if not self.m_blendControl:
             self.m_blendControl = cmds.circle(n=self.m_name+"_IKFKBlend_CTRL")[0]
-            cmds.parent(self.m_blendControl, self.m_group)		
+            cmds.parent(self.m_blendControl, self.m_group)
+            rc.addToLayer(self.m_sceneData, "mainCtrl", self.m_blendControl)	
         self.m_isGenerated = False
         # stretch chain parameters
         self.m_numUpperControls = 2
@@ -58,7 +61,7 @@ class ArmRig:
             self,
             _numControls,
             _joints,
-            _numJoints
+            _numJoints = 0
             ):
         self.m_numUpperControls = _numControls
         if _joints:
@@ -71,7 +74,7 @@ class ArmRig:
             self,
             _numControls,
             _joints,
-            _numJoints
+            _numJoints = 0
             ):
         self.m_numLowerControls = _numControls
         if _joints:
@@ -114,12 +117,16 @@ class ArmRig:
         cmds.cycleCheck(e=False)
         # -- Duplicate joints and rename for IK-FK switch --- #
         self.m_bindJoints = self.duplicateJoints(self.m_startJoints, "BIND")
+        rc.addToLayer(self.m_sceneData, "ref", self.m_bindJoints[0])
         self.m_ikJoints = self.duplicateJoints(self.m_startJoints, "IK")
+        rc.addToLayer(self.m_sceneData, "ref", self.m_ikJoints[0])
         self.m_fkJoints = self.duplicateJoints(self.m_startJoints, "FK")
+        rc.addToLayer(self.m_sceneData, "ref", self.m_fkJoints[0])
+
         # -- Create shoulder locator -- #
         self.m_shoulderLocator = self.m_name+"_shoulder_CTRL"
-        self.m_shoulderLocator = cmds.spaceLocator(n=self.m_shoulderLocator)
-        self.m_shoulderLocator = self.m_shoulderLocator[0]
+        self.m_shoulderLocator = cmds.spaceLocator(n=self.m_shoulderLocator)[0]
+        rc.addToLayer(self.m_sceneData, "detailCtrl", self.m_shoulderLocator)
         rc.orientControl(self.m_shoulderLocator, self.m_startJoints.m_shoulder)
         shoulderGRPs = rg.add3Groups(
             self.m_shoulderLocator, 
@@ -128,7 +135,7 @@ class ArmRig:
         cmds.parent(shoulderGRPs[-1], self.m_group)
         # -- Setup FK rig -- #
         tmpList = self.m_fkJoints.getJointList()
-        self.m_fkRig = fk.FKArmRig(tmpList, self.m_name+"_FK")
+        self.m_fkRig = fk.FKArmRig(self.m_sceneData, tmpList, self.m_name+"_FK")
         self.m_fkRig.generate()
         cmds.parent(self.m_fkRig.m_group, self.m_group)
         cmds.parentConstraint(
@@ -139,6 +146,7 @@ class ArmRig:
         # -- Setup IK rig -- #
         tmpList = self.m_ikJoints.getJointList()
         self.m_ikRig = ik.IKArmRig(
+            self.m_sceneData,
             tmpList, 
             self.m_name+"_IK",
             self.m_isMirrored,
@@ -154,6 +162,7 @@ class ArmRig:
         # -- Setup BIND rig -- #
         tmpList = self.m_bindJoints.getJointList()
         self.m_bindRig = bind.BINDArmRig(
+            self.m_sceneData,
             tmpList, 
             self.m_name+"_BIND",
             self.m_blendControl,
@@ -314,6 +323,10 @@ class ArmRig:
                 self.m_blendAttr, self.m_blendOppAttr
                 )
             cmds.connectAttr(blendedAttr, bindJoints[i] + ".translateX")
+
+        # Fix wrist rotations
+        self.m_bindRig.aimWrist(self.m_ikRig.getIKControl(), [self.m_blendAttr, self.m_blendOppAttr])
+
 
 
 

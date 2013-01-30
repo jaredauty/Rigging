@@ -10,6 +10,7 @@ reload(arm)
 class LegRig:
     def __init__(
             self,
+            _sceneData,
             _name,
             _legJoints,
             _footJoints,
@@ -20,6 +21,7 @@ class LegRig:
             _footMain,
             _twistAxis="y"
             ):
+        self.m_sceneData = _sceneData
         self.m_name = _name
         self.m_group = "%s_GRP" %(self.m_name)
         if not cmds.objExists(self.m_group):
@@ -32,19 +34,65 @@ class LegRig:
         self.m_outsidePivot = _outsidePivot
         self.m_footMain = _footMain
         self.m_twistAxis = _twistAxis
+        # stretch chain parameters
+        self.m_numUpperControls = 2
+        self.m_numLowerControls = 2
+        self.m_numUpperJoints = 5
+        self.m_numLowerJoints = 5
+        self.m_upperStretchJoints = False
+        self.m_lowerStretchJoints = False
+
+    def setUpperStretchChain(
+            self,
+            _numControls,
+            _joints,
+            _numJoints = 0
+            ):
+        self.m_numUpperControls = _numControls
+        if _joints:
+            self.m_upperStretchJoints = _joints
+            self.m_numUpperJoints = len(_joints)
+        else:
+            self.m_numUpperJoints = _numJoints
+
+    def setLowerStretchChain(
+            self,
+            _numControls,
+            _joints,
+            _numJoints = 0
+            ):
+        self.m_numLowerControls = _numControls
+        if _joints:
+            self.m_lowerStretchJoints = _joints
+            self.m_numLowerJoints = len(_joints)
+        else:
+            self.m_numLowerJoints = _numJoints
+
 
     def generate(self):
         # Generate Leg
         self.m_legRig = arm.ArmRig(
+            self.m_sceneData,
             self.m_legJoints, 
             self.m_name,
             self.m_twistAxis,
             False
             )
+        self.m_legRig.setUpperStretchChain(
+            self.m_numUpperControls,
+            self.m_upperStretchJoints,
+            self.m_numUpperJoints
+            )
+        self.m_legRig.setLowerStretchChain(
+            self.m_numLowerControls,
+            self.m_lowerStretchJoints,
+            self.m_numLowerJoints
+            )
         self.m_legRig.generate()
 
         # Generate Foot
         self.m_footRig = fr.FootRig(
+            self.m_sceneData,
             "%s_foot" %(self.m_name),
             self.m_footJoints[0],
             self.m_toePivot,

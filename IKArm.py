@@ -9,7 +9,8 @@ reload(rc)
 reload(aj)
 
 class IKArmRig:
-    def __init__(self, _joints, _name, _isMirrored=False, _twistAxis="y"):
+    def __init__(self, _sceneData, _joints, _name, _isMirrored=False, _twistAxis="y"):
+        self.m_sceneData = _sceneData
         self.m_joints = aj.ArmJoints(_joints)
         self.m_name = _name
         tmp = rg.stripMiddle(self.m_joints.m_shoulder, 0, 3)
@@ -46,19 +47,18 @@ class IKArmRig:
         
     def rigWrist(self):
         self.m_wristCtrl = rg.stripMiddle(self.m_joints.m_wrist, 0, 1)+"_CTRL"
-        self.m_wristCtrl = cmds.spaceLocator(n = self.m_wristCtrl)
-        self.m_wristCtrl = self.m_wristCtrl[0]
+        self.m_wristCtrl = cmds.spaceLocator(n = self.m_wristCtrl)[0]
         rc.orientControl(self.m_wristCtrl, self.m_joints.m_wrist)
         rg.add3Groups(self.m_wristCtrl, ["_SDK", "_CONST", "_0"])
-        #cmds.orientConstraint(self.m_wristCtrl, self.m_joints.m_wrist, mo=1)
         cmds.parent(self.m_wristCtrl+"_0", self.m_group, r=1)
+        rc.addToLayer(self.m_sceneData, "mainCtrl", self.m_wristCtrl)
         
     def setupIK(self):
         #Create shoulder 
         self.m_shoulderCtrl = cmds.spaceLocator(
             n=self.m_joints.m_shoulder.replace("_JNT", "_LOC")
-            )
-        self.m_shoulderCtrl = self.m_shoulderCtrl[0]
+            )[0]
+        rc.addToLayer(self.m_sceneData, "hidden", [self.m_shoulderCtrl])
         rc.orientControl(self.m_shoulderCtrl, self.m_joints.m_shoulder)
         rg.add3Groups(self.m_shoulderCtrl, ["_SDK", "_CONST", "_0"])
         cmds.parent(self.m_shoulderCtrl+"_0", self.m_group, r=1)
@@ -67,7 +67,6 @@ class IKArmRig:
             self.m_joints.m_shoulder, 
             mo=1
             )
-
         desiredName = self.m_wristCtrl.replace("_CTRL", "_IK")
         self.m_ikHandle = cmds.ikHandle(
             n = desiredName, 
@@ -75,9 +74,8 @@ class IKArmRig:
             ee = self.m_joints.m_wrist, 
             sol = "ikRPsolver", 
             see = True
-            )
-        self.m_ikHandle = self.m_ikHandle[0]
-        cmds.setAttr(self.m_ikHandle+".visibility", 0)
+            )[0]
+        rc.addToLayer(self.m_sceneData, "hidden", [self.m_ikHandle])
         cmds.parent(self.m_ikHandle, self.m_wristCtrl)
         self.setupPoleVec()
         
@@ -85,6 +83,7 @@ class IKArmRig:
         middleName = rg.stripMiddle(self.m_joints.m_shoulder, 0, 3)
         desiredName = self.m_name+"PoleVec_LOC"
         self.m_poleVec = cmds.spaceLocator(n = desiredName)[0]
+        rc.addToLayer(self.m_sceneData, "mainCtrl", self.m_poleVec)
         cmds.addAttr(
             self.m_poleVec, 
             ln=self.m_poleVecPinAttr, 
@@ -124,7 +123,7 @@ class IKArmRig:
         cmds.parent(midGroup, self.m_group)
         cmds.pointConstraint(self.m_joints.m_elbow1, midGroup)
         cmds.pointConstraint(self.m_joints.m_elbow2, midGroup)
-        lineNodes = rc.createLine([self.m_poleVec, midGroup])
+        lineNodes = rc.createLine([self.m_poleVec, midGroup], self.m_sceneData, "mainCtrl")
         cmds.parent(lineNodes[0], self.m_group)
 
     def createAngleNode(self, _locator1, _locator2, _locator3):
@@ -272,7 +271,7 @@ class IKArmRig:
             distParent = cmds.listRelatives(node, p=1)
             distParent = distParent[0]
             cmds.parent(distParent, self.m_group) 
-            cmds.setAttr(node+".visibility", 0)
+        rc.addToLayer(self.m_sceneData, "hidden", distNodes)
 
         #Create angle nodes
         angleAttr = self.createAngleNode(

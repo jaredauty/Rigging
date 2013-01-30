@@ -10,7 +10,8 @@ reload(rg)
 reload(vec)
 
 class StretchChain:
-    def __init__(self, _parent1, _parent2, _name, _numCtrls, _numJoints = 5):
+    def __init__(self, _sceneData, _parent1, _parent2, _name, _numCtrls, _numJoints = 5):
+        self.m_sceneData = _sceneData
         self.m_parent1 = _parent1
         self.m_parent2 = _parent2
         self.m_name = _name
@@ -127,6 +128,7 @@ class StretchChain:
             self.m_bindJoints = newJoints
         #Put it in the right group
         cmds.parent(self.m_bindJoints[0], self.m_group)
+        rc.addToLayer(self.m_sceneData, "ref", self.m_bindJoints[0])
 
     def createControls(self):
         #If no blend control is speified add one
@@ -179,10 +181,12 @@ class StretchChain:
                 parentCtrl = cmds.duplicate(newCtrl, n=parentCtrl)[0]
                 print parentCtrl, newCtrlGroups[2]
                 cmds.parent(parentCtrl, newCtrlGroups[2])
-                cmds.setAttr(parentCtrl+".visibility", 0)
+                #cmds.setAttr(parentCtrl+".visibility", 0)
                 pointCtrl = cmds.duplicate(newCtrl, n=pointCtrl)[0]
                 cmds.parent(pointCtrl, newCtrlGroups[2])
-                cmds.setAttr(pointCtrl+".visibility", 0)
+                #cmds.setAttr(pointCtrl+".visibility", 0)
+
+                rc.addToLayer(self.m_sceneData, "hidden", [parentCtrl, pointCtrl])
 
                 #Create blend between parent and point setups
                 blendConst = cmds.pointConstraint(parentCtrl, newCtrlGroups[1])
@@ -218,6 +222,7 @@ class StretchChain:
             #lock attrs
             cmds.setAttr(newCtrl+".rotate", l=1)
             cmds.setAttr(newCtrl+".scale", l=1)
+        rc.addToLayer(self.m_sceneData, "detailCtrl", self.m_controls)
             
     def createIK(self):
         numCVs = self.m_numCtrls - 1
@@ -235,7 +240,8 @@ class StretchChain:
         self.m_ikCurve = cmds.rename(self.m_ikCurve, newCurveName)
         self.m_ikHandle = ikResult[0]
         cmds.parent(self.m_ikHandle, self.m_group)
-        cmds.setAttr(self.m_ikHandle+".visibility", 0)
+        #cmds.setAttr(self.m_ikHandle+".visibility", 0)
+        rc.addToLayer(self.m_sceneData, "hidden", [self.m_ikHandle])
         #Make sure curve does not get double transformed
         cmds.setAttr(self.m_ikCurve+".inheritsTransform", 0)
         self.m_clusters = []
@@ -371,7 +377,11 @@ class StretchChain:
         centerDist = (len(self.m_bindJoints) - 1) / 2.0
         for i in range(1, (len(self.m_bindJoints) - 1)):
             initialLength = cmds.getAttr("%s.tx" %(self.m_bindJoints[i]))
-            scaleOffset = 1.0 / ((abs(centerDist - i) * centerDist) + 0.0001)
+            scaleOffset = 0
+            if centerDist - i == 0:
+                scaleOffset = (1.0 / centerDist) * 2.0
+            else:
+                scaleOffset = 1.0 / ((abs(centerDist - i) * centerDist) + 0.0001)
             squetchExp = "%s\n%s.tx = %f * %s;\n" %(
                                                     squetchExp, 
                                                     self.m_bindJoints[i],
@@ -455,6 +465,7 @@ class StretchChain:
             "%s.dWorldUpMatrixEnd" %(self.m_ikHandle),
             f = True
             )
+        rc.addToLayer(self.m_sceneData, "detailCtrl", [self.m_twistControl1, self.m_twistControl2])
 
     def fixControlAims(self):
         for control in self.m_controls:
@@ -463,7 +474,7 @@ class StretchChain:
                     e=True,
                     worldUpType="object",
                     worldUpObject=self.m_twistControl1,
-                    mo=True
+                    mo=False
                     )
         if self.m_numCtrls == 1:
             cmds.aimConstraint(
@@ -478,14 +489,15 @@ class StretchChain:
                 #mo=True,
                 e=True,
                 worldUpType="object",
-                worldUpObject=self.m_twistControl2,
+                worldUpObject=self.m_twistControl2
                 )
         
     def clusterPoint(self, _point, _control, _name, _constraint = cmds.parentConstraint, _aim = False):
         #pos = cmds.xform(_control, t=1, q=1, ws=1)
         #cmds.xform(_point, t=pos, ws=1)
         clusterResult = cmds.cluster(_point, n=_name)
-        cmds.setAttr(clusterResult[1]+".visibility", 0)
+        #cmds.setAttr(clusterResult[1]+".visibility", 0)
+        rc.addToLayer(self.m_sceneData, "hidden", [clusterResult[1]])
         cmds.parent(clusterResult[1], self.m_group)
         _constraint(_control, clusterResult[1], mo=1)
         if _aim:

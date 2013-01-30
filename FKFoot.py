@@ -10,11 +10,13 @@ reload(rg)
 class FKFootRig:
     def __init__(
             self,
+            _sceneData,
             _name,
             _joints,
             _footMain,
             _parent
             ):
+        self.m_sceneData = _sceneData
         self.m_name = _name
         self.m_group = cmds.group(n="%s_GRP" %(self.m_name), em=True)
         self.m_joints = _joints
@@ -37,6 +39,7 @@ class FKFootRig:
             n="%s_ankle_CTRL" %(self.m_name),
             nr=(0, 1, 0)
             )[0]
+        rc.addToLayer(self.m_sceneData, "mainCtrl", self.m_ankleCtrl)
         rc.orientControl(self.m_ankleCtrl, self.m_footMain)
         groups = rg.add3Groups(self.m_ankleCtrl, ["_SDK", "_CONST", "_0"])
         cmds.parentConstraint(self.m_ankleCtrl, self.m_joints[0], mo = True)
@@ -55,6 +58,7 @@ class FKFootRig:
             n="%s_toe_CTRL" %(self.m_name),
             nr=(1, 0, 0)
             )[0]
+        rc.addToLayer(self.m_sceneData, "mainCtrl", self.m_toeCtrl)
         rc.orientControl(self.m_toeCtrl, self.m_joints[1])
         groups = rg.add3Groups(self.m_toeCtrl, ["_SDK", "_CONST", "_0"])
         cmds.parentConstraint(self.m_toeCtrl, self.m_joints[1])
