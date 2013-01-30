@@ -20,6 +20,7 @@ class FKArmRig:
         self.m_group = self.m_name+"_GRP"
         self.m_group = cmds.group(n=self.m_group, em=1)
         cmds.parent(self.m_joints.m_shoulder, self.m_group, r=1)
+        self.m_allControls = []
         self.m_isGenerated = False
         
     def generate(self):
@@ -36,6 +37,9 @@ class FKArmRig:
        cmds.cycleCheck(e=True)
        self.m_isGenerated = True
        
+    def getAllControls(self):
+      return self.m_allControls
+
     def getFKParent(self):
         assert self.m_isGenerated, "Rig not generated"
         return self.m_wristCtrl
@@ -54,6 +58,9 @@ class FKArmRig:
                 )
            self.m_shoulderGBLCtrl = gimbalCtrls[0]
            self.m_shoulderCtrl = gimbalCtrls[1]    
+           # Add to controls
+           self.m_allControls.append(self.m_shoulderCtrl)
+           self.m_allControls.append(self.m_shoulderGBLCtrl)
            rc.addToLayer(self.m_sceneData, "mainCtrl", gimbalCtrls)      
            self.m_isShoulder = True
            cmds.parent(self.m_shoulderCtrl+"_0", self.m_group, r=1)
@@ -133,6 +140,8 @@ class FKArmRig:
             ["tx", "ty", "tz",  "sx",  "sy",  "sz"]
             )
        rc.addToLayer(self.m_sceneData, "mainCtrl", [self.m_stretchCtrl, self.m_elbowCtrl])
+       #Add to controls
+       self.m_allControls = self.m_allControls + [self.m_stretchCtrl, self.m_elbowCtrl]
        self.m_isElbow = True
 
 
@@ -169,6 +178,8 @@ class FKArmRig:
             True,
             False
             )
+       # Add to controls
+       self.m_allControls.append(self.m_wristCtrl)
        rc.addToLayer(self.m_sceneData, "mainCtrl", self.m_wristCtrl)
        self.m_isWrist = True
            

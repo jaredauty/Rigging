@@ -137,14 +137,11 @@ class LegRig:
     def duplicateFootJoints(self, _joints):
         dupJoints = cmds.duplicate(_joints[0], rc=True)
         i = 0
-        print "foot joints = %s" %(_joints)
-        print "dupJoints joints = %s" %(dupJoints)
         for name in [
                 "%s_footAnkle_JNT" %(self.m_name),
                 "%s_ball_JNT" %(self.m_name),
                 "%s_toeEnd_JNT" %(self.m_name)
                 ]:
-            print "%s\n" %(i)
             cmds.rename(dupJoints[i], name)
             dupJoints[i] = name
             i+=1

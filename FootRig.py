@@ -51,7 +51,6 @@ class FootRig:
         if not cmds.objExists(
                 "%s.%s" %(self.m_blendControl, self.m_blendAttr
                 )):
-            print "add attr"
             cmds.addAttr(
                 self.m_blendControl,
                 ln=self.m_blendAttr,
@@ -116,6 +115,8 @@ class FootRig:
         cmds.parentConstraint(targetList, self.m_parentTwist, e=True, rm=True)
         # Add new constraint
         cmds.parentConstraint(self.m_bindJoints[0], self.m_parentTwist, mo=1)
+        # Add to sets
+        rc.addToSet(self.m_sceneData, "bind", self.m_bindJoints)
 
     def connectBind(self):
         #Create opposite node to blend
@@ -155,6 +156,7 @@ class FootRig:
                  ]:
              cmds.rename(dupJoints[i], name)
              dupJoints[i] = name
+             rc.stripSets(dupJoints[i])
              i+=1
          return dupJoints
 

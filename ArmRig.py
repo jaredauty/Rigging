@@ -4,6 +4,7 @@ This script should take in a collection of joints, that represent an arm and
 set up a default rig for them
 """
 import maya.cmds as cmds
+import pickle
 import RiggingControls as rc
 import RiggingGroups as rg
 import FKArm as fk
@@ -44,11 +45,14 @@ class ArmRig:
         self.m_rigWrist = _rigWrist
         self.m_blendControl = _blendControl
         self.m_isMirrored = self.checkMirroring()
+        self.m_allControls = []
         if not self.m_blendControl:
             self.m_blendControl = cmds.circle(n=self.m_name+"_IKFKBlend_CTRL")[0]
             cmds.parent(self.m_blendControl, self.m_group)
             rc.addToLayer(self.m_sceneData, "mainCtrl", self.m_blendControl)	
+            self.m_allControls.append(self.m_blendControl)
         self.m_isGenerated = False
+        
         # stretch chain parameters
         self.m_numUpperControls = 2
         self.m_numLowerControls = 2
@@ -83,6 +87,9 @@ class ArmRig:
         else:
             self.m_numLowerJoints = _numJoints
 
+    def getAllControls(self):
+        return self.m_allControls
+
     def getVisibilityAttrs(self):
         assert self.m_isGenerated, "Rig hasn't been generated"
         return self.m_ikVisibilityAttr, self.m_fkVisibilityAttr
@@ -112,6 +119,9 @@ class ArmRig:
     def getIKControl(self):
         assert self.m_isGenerated, "Rig hasn't been generated"
         return self.m_ikRig.getIKControl()
+
+    def saveControls(self):
+        pickle.dump(self.getAllControls(), open("%s_RIG.ctrls" %(self.m_name), "wb"))
 
     def generate(self):
         cmds.cycleCheck(e=False)
@@ -195,6 +205,13 @@ class ArmRig:
          
         cmds.cycleCheck(e=True)
         
+        # Add all controls
+        self.m_allControls.append(self.m_shoulderLocator)
+        self.m_allControls = self.m_allControls + \
+            self.m_fkRig.getAllControls() + \
+            self.m_ikRig.getAllControls() +  \
+            self.m_bindRig.getAllControls()
+
         self.m_isGenerated = True
         
         
@@ -239,6 +256,7 @@ class ArmRig:
             newName = self.m_name+"_"+_postFix+"_"+\
                 _joints[i][:jointNameEnd] + "_JNT"
             newJoints[i] = cmds.rename(newJoints[i], newName)
+            rc.stripSets(newJoints[i])
         return aj.ArmJoints(newJoints)
         
         

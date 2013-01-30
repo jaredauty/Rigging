@@ -5,7 +5,6 @@ import ErrorChecking as error
 import SceneData as sd
 reload(sd)
 reload(error)
-
 reload(rg)
 
 #contains all of the procedures used to create controls
@@ -374,12 +373,18 @@ def switchShape(_old, _new, _copy=False):
     cmds.makeIdentity(_new, apply=True)
     #Switch the shape
     newShape = cmds.listRelatives(_new, s=1, f=1)
-    oldShape = cmds.listRelatives(_old, s=1, f=1)
+    oldShape = cmds.listRelatives(_old, s=1, f=1)[0]
     cmds.parent(newShape, _old, s=1, r=1)
     #Clean up
-    cmds.delete(oldShape)
     cmds.delete(_new)
     cmds.delete(tmpGroup)
+    # Sometimes this fails because of locked node.
+    cmds.delete(oldShape)
+    if cmds.objExists(oldShape):
+        print "Couldn't delete, setting visibility instead"
+        # in this case just hide the control
+        cmds.setAttr("%s.visibility" %(oldShape), 0)
+
 
 def reorientRecursive(_topJoint, _up, _upVec=(0, 0, 1), _aimVec=(1, 0, 0)):
     children = cmds.listRelatives(_topJoint, children=True)
@@ -439,6 +444,30 @@ def addToLayer(_data, _layer, _objects):
     else:
         assert type(_objects) == type("") or type(_objects) == type(u''), "_objects must be a string"
         cmds.editDisplayLayerMembers(_data.getLayer(_layer), _objects)
+
+def addToSet(_data, _set, _objects):
+    assert isinstance(_data, sd.SceneData), "_data must be SceneData object"
+    error.assertString(_set)
+    actualSet = _data.getSet(_set)
+    if actualSet:
+        if type(_objects) == type([]):
+            for obj in _objects:
+                error.assertMayaObject(obj)
+                cmds.sets(obj, add=actualSet)
+        else:
+            error.assertMayaObject(_objects)
+            cmds.sets(_objects, add=actualSet)
+
+def stripSets(_object):
+    error.assertMayaObject(_object)
+    skipSets = [u'defaultLightSet', u'defaultObjectSet', u'initialParticleSE', u'initialShadingGroup']
+    sets = cmds.ls(sets=True)
+    if sets:
+        for a in sets:
+            if a not in skipSets:
+                cmds.sets(_object, rm=a)
+
+
 
 def getJointChain(_topJoint):
     error.assertType(_topJoint, ["", u''])

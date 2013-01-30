@@ -21,6 +21,7 @@ class IKArmRig:
         self.m_maxStretchAttr = "maxStretchOffset"
         self.m_isMirrored = False
         self.m_twistAxis = _twistAxis
+        self.m_allControls = []
         self.m_isGenerated = False
         
     def generate(self):
@@ -31,6 +32,8 @@ class IKArmRig:
        cmds.cycleCheck(e=True)
        self.m_isGenerated = True
 
+    def getAllControls(self):
+        return self.m_allControls
 
     def getIKControl(self):
         assert self.m_isGenerated, "Rig not generated"
@@ -51,6 +54,8 @@ class IKArmRig:
         rc.orientControl(self.m_wristCtrl, self.m_joints.m_wrist)
         rg.add3Groups(self.m_wristCtrl, ["_SDK", "_CONST", "_0"])
         cmds.parent(self.m_wristCtrl+"_0", self.m_group, r=1)
+        # Add to controls
+        self.m_allControls.append(self.m_wristCtrl)
         rc.addToLayer(self.m_sceneData, "mainCtrl", self.m_wristCtrl)
         
     def setupIK(self):
@@ -58,7 +63,9 @@ class IKArmRig:
         self.m_shoulderCtrl = cmds.spaceLocator(
             n=self.m_joints.m_shoulder.replace("_JNT", "_LOC")
             )[0]
-        rc.addToLayer(self.m_sceneData, "hidden", [self.m_shoulderCtrl])
+        # Add to controls
+        self.m_allControls.append(self.m_shoulderCtrl)
+        rc.addToLayer(self.m_sceneData, "hidden", self.m_shoulderCtrl)
         rc.orientControl(self.m_shoulderCtrl, self.m_joints.m_shoulder)
         rg.add3Groups(self.m_shoulderCtrl, ["_SDK", "_CONST", "_0"])
         cmds.parent(self.m_shoulderCtrl+"_0", self.m_group, r=1)
@@ -83,6 +90,8 @@ class IKArmRig:
         middleName = rg.stripMiddle(self.m_joints.m_shoulder, 0, 3)
         desiredName = self.m_name+"PoleVec_LOC"
         self.m_poleVec = cmds.spaceLocator(n = desiredName)[0]
+        # Add to controls
+        self.m_allControls.append(self.m_poleVec)
         rc.addToLayer(self.m_sceneData, "mainCtrl", self.m_poleVec)
         cmds.addAttr(
             self.m_poleVec, 

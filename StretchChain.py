@@ -28,6 +28,7 @@ class StretchChain:
         self.m_twistAxis = "y"
         self.m_userJoints = False
         self.m_isAutoBend = True
+        self.m_allControls = []
         
         #create null for scale fixing
         self.m_scaleNull = cmds.group(em=1, n=_name+"_NULL", w=True)
@@ -85,6 +86,9 @@ class StretchChain:
     def getEndBindJoint(self):
         return self.m_bindJoints[-1]
 
+    def getAllControls(self):
+        return self.m_allControls
+
     def generate(self):    
         self.createJoints()
         self.createControls()
@@ -121,7 +125,6 @@ class StretchChain:
         else:
             # Duplicate joints and rename
             newJoints = cmds.duplicate(self.m_userJoints[0], rc=1)
-            print newJoints
             for i in range(len(newJoints)):
                 newJoint = "%s_%d_BIND_JNT" %(self.m_name, i)
                 newJoints[i] = cmds.rename(newJoints[i], newJoint)
@@ -129,12 +132,19 @@ class StretchChain:
         #Put it in the right group
         cmds.parent(self.m_bindJoints[0], self.m_group)
         rc.addToLayer(self.m_sceneData, "ref", self.m_bindJoints[0])
+        #Strip sets
+        for joint in self.m_bindJoints:
+            rc.stripSets(joint)
+        #Add all except first and last to bind set
+        for joint in self.m_bindJoints[1:-1]:
+            rc.addToSet(self.m_sceneData, "bind", joint)
 
     def createControls(self):
         #If no blend control is speified add one
         if not self.m_blendControl:
             self.m_blendControl = cmds.circle(n=self.m_name+"Blend_CTRL")[0]
             cmds.parent(self.m_blendControl, self.m_group)
+            self.m_allControls.append(self.m_blendControl)
 
         cmds.addAttr(
             self.m_blendControl,
@@ -179,7 +189,6 @@ class StretchChain:
             
             if self.m_isAutoBend:
                 parentCtrl = cmds.duplicate(newCtrl, n=parentCtrl)[0]
-                print parentCtrl, newCtrlGroups[2]
                 cmds.parent(parentCtrl, newCtrlGroups[2])
                 #cmds.setAttr(parentCtrl+".visibility", 0)
                 pointCtrl = cmds.duplicate(newCtrl, n=pointCtrl)[0]
@@ -223,6 +232,8 @@ class StretchChain:
             cmds.setAttr(newCtrl+".rotate", l=1)
             cmds.setAttr(newCtrl+".scale", l=1)
         rc.addToLayer(self.m_sceneData, "detailCtrl", self.m_controls)
+        # Add controls
+        self.m_allControls = self.m_allControls + self.m_controls
             
     def createIK(self):
         numCVs = self.m_numCtrls - 1
@@ -236,6 +247,7 @@ class StretchChain:
            n = self.m_name + "_IK"
            )
         self.m_ikCurve = ikResult[2]
+        rc.addToLayer(self.m_sceneData, "hidden", self.m_ikCurve)
         newCurveName = self.m_name+"_IK_CURVE"
         self.m_ikCurve = cmds.rename(self.m_ikCurve, newCurveName)
         self.m_ikHandle = ikResult[0]
@@ -375,7 +387,7 @@ class StretchChain:
             "float $strUserOpp = 1 - $strUser;\n" +\
             "float $strV = 1 / "+_stretchValueAttr+";\n\n"
         centerDist = (len(self.m_bindJoints) - 1) / 2.0
-        for i in range(1, (len(self.m_bindJoints) - 1)):
+        for i in range(1, (len(self.m_bindJoints))):
             initialLength = cmds.getAttr("%s.tx" %(self.m_bindJoints[i]))
             scaleOffset = 0
             if centerDist - i == 0:
@@ -388,10 +400,11 @@ class StretchChain:
                                                     initialLength,
                                                     _stretchValueAttr
                                                     )
-            squetchExp = squetchExp + "float $scale = clamp(0.001, 1000,"+\
-                "$strUserOpp + pow($strV,"+ str(scaleOffset)+")*$strUser);\n"+\
-                self.m_bindJoints[i]+".sy = $scale;\n"+\
-                self.m_bindJoints[i]+".sz = $scale;\n\n"
+            if i != len(self.m_bindJoints) - 1:
+                squetchExp = squetchExp + "float $scale = clamp(0.001, 1000,"+\
+                    "$strUserOpp + pow($strV,"+ str(scaleOffset)+")*$strUser);\n"+\
+                    self.m_bindJoints[i]+".sy = $scale;\n"+\
+                    self.m_bindJoints[i]+".sz = $scale;\n\n"
         squetchExp = squetchExp + "}\n"
         return squetchExp
 
@@ -466,6 +479,9 @@ class StretchChain:
             f = True
             )
         rc.addToLayer(self.m_sceneData, "detailCtrl", [self.m_twistControl1, self.m_twistControl2])
+
+        #Add to controls
+        self.m_allControls = self.m_allControls + [self.m_twistControl1, self.m_twistControl2]
 
     def fixControlAims(self):
         for control in self.m_controls:

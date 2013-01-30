@@ -45,6 +45,7 @@ class BINDArmRig:
             self.m_joints.m_shoulder, 
             "%s_0" %(self.m_joints.m_shoulder)
             )
+        self.m_allControls = []
         self.m_isGenerated = False
 
         # stretch chain parameters
@@ -62,8 +63,14 @@ class BINDArmRig:
         self.setupStretch()
         # if self.m_rigWrist:
         #     self.aimWrist()
+
+        # Put joints in the right sets
+        rc.addToSet(self.m_sceneData, "bind", self.m_joints.getJointList())
         cmds.cycleCheck(e=True)
         self.m_isGenerated = True
+
+    def getAllControls(self):
+        return self.m_allControls
 
     def getEndJoint(self):
         assert self.m_isGenerated, "Rig not generated"
@@ -94,6 +101,7 @@ class BINDArmRig:
         gimbalCtrls = rc.makeGimbalCTRL(self.m_joints.m_wrist, False, False)
         self.m_wristCtrl = gimbalCtrls[1]
         self.m_wristGBLCtrl = gimbalCtrls[0]
+        self.m_allControls = self.m_allControls + gimbalCtrls
         rc.addToLayer(self.m_sceneData, "mainCtrl", gimbalCtrls)
         #Lock controls
         for control in [self.m_wristCtrl, self.m_wristGBLCtrl]:
@@ -177,6 +185,9 @@ class BINDArmRig:
         twistControls = self.m_lowerStretch.getTwistControls()
         cmds.parent(twistControls[0], self.m_upperStretch.getTwistControls()[1])
         # Hide unused twist controls
+        self.m_allControls = self.m_allControls + \
+            self.m_upperStretch.getAllControls() + \
+            self.m_lowerStretch.getAllControls()
         rc.addToLayer(self.m_sceneData, "hidden", twistControls)
         # for control in twistControls:
         #     cmds.setAttr("%s.visibility" %(control), 0)

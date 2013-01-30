@@ -24,6 +24,14 @@ def assertList(_list, _typeExamples):
 		assertType(obj, _typeExamples)
 
 def assertMayaType(_object, _type):
-	assertType(_object, ["", u''])
-	assertType(_type, ["", u''])
+	assertString(_object)
+	assertString(_type)
 	assert cmds.objectType(_object, isType = _type), "%s is not of type %s" %(_object, _type)
+
+def assertMayaObject(_object):
+	assertString(_object)
+	assert cmds.objExists(_object), "%s does not exist!" %(_object)
+
+def assertString(_object):
+	assertType(_object, ["", u''])
+
