@@ -35,3 +35,9 @@ def assertMayaObject(_object):
 def assertString(_object):
 	assertType(_object, ["", u''])
 
+def assertStringDict(_dict):
+	assert type(_dict) == type({}), "_dict not of type dictionary"
+	for key in _dict:
+		assertString(key)
+		assertString(_dict[key])
+

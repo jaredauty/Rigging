@@ -10,11 +10,12 @@ reload(rg)
 reload(vec)
 
 class StretchChain:
-    def __init__(self, _sceneData, _parent1, _parent2, _name, _numCtrls, _numJoints = 5):
+    def __init__(self, _sceneData, _parent1, _parent2, _name, _baseName, _numCtrls, _numJoints = 5):
         self.m_sceneData = _sceneData
         self.m_parent1 = _parent1
         self.m_parent2 = _parent2
         self.m_name = _name
+        self.m_baseName = _baseName
         self.m_group = cmds.group(em=1, n=_name+"_GRP")
         self.m_numCtrls = _numCtrls
         self.m_numJoints = _numJoints
@@ -28,7 +29,7 @@ class StretchChain:
         self.m_twistAxis = "y"
         self.m_userJoints = False
         self.m_isAutoBend = True
-        self.m_allControls = []
+        self.m_allControls = {}
         
         #create null for scale fixing
         self.m_scaleNull = cmds.group(em=1, n=_name+"_NULL", w=True)
@@ -145,6 +146,11 @@ class StretchChain:
             self.m_blendControl = cmds.circle(n=self.m_name+"Blend_CTRL")[0]
             cmds.parent(self.m_blendControl, self.m_group)
             self.m_allControls.append(self.m_blendControl)
+            rc.addToControlDict(
+                self.m_allControls,
+                "%s_StretchChainCtrl" %(self.m_baseName),
+                self.m_blendControl
+                )
 
         cmds.addAttr(
             self.m_blendControl,
@@ -233,7 +239,10 @@ class StretchChain:
             cmds.setAttr(newCtrl+".scale", l=1)
         rc.addToLayer(self.m_sceneData, "detailCtrl", self.m_controls)
         # Add controls
-        self.m_allControls = self.m_allControls + self.m_controls
+        i=0
+        for control in self.m_controls:
+            rc.addToControlDict(self.m_allControls, "%s_%d_detail" %(self.m_baseName, i), control)
+            i+=1
             
     def createIK(self):
         numCVs = self.m_numCtrls - 1
@@ -432,22 +441,22 @@ class StretchChain:
                                     [self.m_parent1, self.m_parent2]
                                     ): 
             rc.orientControl(control, parent)
-            group = rg.addGroup(control, "%s_0" %(control))
+            groups = rg.add3Groups(control, ["_SDK", "_CONST", "_0"])
             if self.m_isMirrored:
                 cmds.setAttr(
-                    "%s.t%s" %(control, self.m_twistAxis),
+                    "%s.t%s" %(groups[0], self.m_twistAxis),
                     1
                     )
             else:
                 cmds.setAttr(
-                    "%s.t%s" %(control, self.m_twistAxis),
+                    "%s.t%s" %(groups[0], self.m_twistAxis),
                     -1
                     )
-            cmds.parentConstraint(parent, group, mo=1)
-            cmds.parent(group, self.m_group)
+            cmds.parentConstraint(parent, groups[1], mo=1)
+            cmds.parent(groups[2], self.m_group)
             rc.lockAttrs(
                 control,
-                ["rotate", "scale"],
+                ["rotate", "scale", "visibility"],
                 True,
                 False
                 )
@@ -481,7 +490,8 @@ class StretchChain:
         rc.addToLayer(self.m_sceneData, "detailCtrl", [self.m_twistControl1, self.m_twistControl2])
 
         #Add to controls
-        self.m_allControls = self.m_allControls + [self.m_twistControl1, self.m_twistControl2]
+        rc.addToControlDict(self.m_allControls, "%s_topTwist" %(self.m_baseName), self.m_twistControl1)
+        rc.addToControlDict(self.m_allControls, "%s_lowTwist" %(self.m_baseName), self.m_twistControl2)
 
     def fixControlAims(self):
         for control in self.m_controls:

@@ -18,6 +18,7 @@ class BINDArmRig:
             _sceneData,
             _joints,
             _name,
+            _baseName,
             _controlObject,
             _numUpperControls,
             _numLowerControls,
@@ -33,6 +34,7 @@ class BINDArmRig:
         self.m_isMirrored = _isMirrored
         self.m_joints = aj.ArmJoints(_joints)
         self.m_name = _name
+        self.m_baseName = _baseName
         self.m_controlObject = _controlObject
         self.m_twistAxis = _twistAxis
         self.m_rigWrist = _rigWrist
@@ -45,7 +47,7 @@ class BINDArmRig:
             self.m_joints.m_shoulder, 
             "%s_0" %(self.m_joints.m_shoulder)
             )
-        self.m_allControls = []
+        self.m_allControls = {}
         self.m_isGenerated = False
 
         # stretch chain parameters
@@ -101,7 +103,8 @@ class BINDArmRig:
         gimbalCtrls = rc.makeGimbalCTRL(self.m_joints.m_wrist, False, False)
         self.m_wristCtrl = gimbalCtrls[1]
         self.m_wristGBLCtrl = gimbalCtrls[0]
-        self.m_allControls = self.m_allControls + gimbalCtrls
+        rc.addToControlDict(self.m_allControls, "%s_bindWrist" %(self.m_baseName), self.m_wristCtrl)
+        rc.addToControlDict(self.m_allControls, "%s_bindWristGBL" %(self.m_baseName), self.m_wristGBLCtrl)
         rc.addToLayer(self.m_sceneData, "mainCtrl", gimbalCtrls)
         #Lock controls
         for control in [self.m_wristCtrl, self.m_wristGBLCtrl]:
@@ -115,31 +118,6 @@ class BINDArmRig:
             self.m_joints.m_wrist, 
             mo=True
             )
-        # Move and parent blend control
-        rc.orientControl(self.m_controlObject, self.m_wristCtrl)
-        group = rg.addGroup(self.m_controlObject, "%s_0" %(self.m_controlObject))
-        moveValue = -2
-        if self.m_isMirrored:
-            moveValue *= -1
-        cmds.setAttr("%s.t%s" %(self.m_controlObject, self.m_twistAxis), moveValue)
-        cmds.parentConstraint(self.m_wristCtrl, group, mo=1)
-        rc.lockAttrs(
-            self.m_controlObject, 
-            [
-                "tx", 
-                "ty",
-                "tz", 
-                "rx", 
-                "ry", 
-                "rz", 
-                "sx", 
-                "sy", 
-                "sz", 
-                "visibility"
-            ],
-            True,
-            True
-            )
         
     def setupStretch(self):
        #Create the bendy bits 
@@ -148,6 +126,7 @@ class BINDArmRig:
             self.m_joints.m_shoulder, 
             self.m_joints.m_elbow1, 
             self.m_name+"_upperStretch", 
+            "%s_upperStretch" %(self.m_baseName),
             self.m_numLowerControls, 
             self.m_numUpperJoints
             )
@@ -168,6 +147,7 @@ class BINDArmRig:
             self.m_joints.m_elbow2, 
             self.m_joints.m_wrist, 
             self.m_name+"_lowerStretch",
+            "%s_lowerStretch" %(self.m_baseName),
             self.m_numLowerControls, 
             self.m_numLowerJoints
             )
@@ -184,11 +164,11 @@ class BINDArmRig:
         # parent lower twist
         twistControls = self.m_lowerStretch.getTwistControls()
         cmds.parent(twistControls[0], self.m_upperStretch.getTwistControls()[1])
+        rc.addDictToControlDict(self.m_allControls, self.m_upperStretch.getAllControls())
+        rc.addDictToControlDict(self.m_allControls, self.m_lowerStretch.getAllControls())
         # Hide unused twist controls
-        self.m_allControls = self.m_allControls + \
-            self.m_upperStretch.getAllControls() + \
-            self.m_lowerStretch.getAllControls()
         rc.addToLayer(self.m_sceneData, "hidden", twistControls)
+
         # for control in twistControls:
         #     cmds.setAttr("%s.visibility" %(control), 0)
 

@@ -4,14 +4,17 @@
 import maya.cmds as cmds
 import FootRig as fr
 import ArmRig as arm
+import RiggingControls as rc
 reload(fr)
 reload(arm)
+reload(rc)
 
 class LegRig:
     def __init__(
             self,
             _sceneData,
             _name,
+            _baseName,
             _legJoints,
             _footJoints,
             _toePivot,
@@ -23,6 +26,7 @@ class LegRig:
             ):
         self.m_sceneData = _sceneData
         self.m_name = _name
+        self.m_baseName = _baseName
         self.m_group = "%s_GRP" %(self.m_name)
         if not cmds.objExists(self.m_group):
             self.m_group = cmds.group(n=self.m_group, em=True)
@@ -34,6 +38,7 @@ class LegRig:
         self.m_outsidePivot = _outsidePivot
         self.m_footMain = _footMain
         self.m_twistAxis = _twistAxis
+        self.m_allControls = {}
         # stretch chain parameters
         self.m_numUpperControls = 2
         self.m_numLowerControls = 2
@@ -68,6 +73,11 @@ class LegRig:
         else:
             self.m_numLowerJoints = _numJoints
 
+    def getAllControls(self):
+        return self.m_allControls
+
+    def getGroup(self):
+        return self.m_group
 
     def generate(self):
         # Generate Leg
@@ -75,6 +85,7 @@ class LegRig:
             self.m_sceneData,
             self.m_legJoints, 
             self.m_name,
+            self.m_baseName,
             self.m_twistAxis,
             False
             )
@@ -89,11 +100,13 @@ class LegRig:
             self.m_numLowerJoints
             )
         self.m_legRig.generate()
+        rc.addDictToControlDict(self.m_allControls, self.m_legRig.getAllControls())
 
         # Generate Foot
         self.m_footRig = fr.FootRig(
             self.m_sceneData,
             "%s_foot" %(self.m_name),
+            self.m_baseName,
             self.m_footJoints[0],
             self.m_toePivot,
             self.m_heelPivot,
@@ -107,7 +120,11 @@ class LegRig:
             self.m_legRig.getBlendControl()
             )
         self.m_footRig.generate()
+        rc.addDictToControlDict(self.m_allControls, self.m_footRig.getAllControls())
         cmds.parent(self.m_footRig.getGroup(), self.m_group)
+
+        #Rig blend control
+        self.m_legRig.rigBlendControl(self.m_footRig.getAnkleJoint())
 
         # Connect up visibility
         ikVis, fkVis = self.m_legRig.getVisibilityAttrs()

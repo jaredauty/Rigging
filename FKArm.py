@@ -9,18 +9,19 @@ reload(rg)
 reload(aj)
 
 class FKArmRig:
-    def __init__(self, _sceneData, _joints, _name):
+    def __init__(self, _sceneData, _joints, _name, _baseName):
         self.m_sceneData = _sceneData
         self.m_isShoulder = False
         self.m_isElbow = False
         self.m_isWrist = False
         self.m_joints = aj.ArmJoints(_joints)
         self.m_name = _name
+        self.m_baseName = _baseName
         tmp = self.stripMiddle(self.m_joints.m_shoulder, 0, 3)
         self.m_group = self.m_name+"_GRP"
         self.m_group = cmds.group(n=self.m_group, em=1)
         cmds.parent(self.m_joints.m_shoulder, self.m_group, r=1)
-        self.m_allControls = []
+        self.m_allControls = {}
         self.m_isGenerated = False
         
     def generate(self):
@@ -59,8 +60,12 @@ class FKArmRig:
            self.m_shoulderGBLCtrl = gimbalCtrls[0]
            self.m_shoulderCtrl = gimbalCtrls[1]    
            # Add to controls
-           self.m_allControls.append(self.m_shoulderCtrl)
-           self.m_allControls.append(self.m_shoulderGBLCtrl)
+           rc.addToControlDict(self.m_allControls, "%s_FKShoulder" %(self.m_baseName), self.m_shoulderCtrl)
+           rc.addToControlDict(
+              self.m_allControls,
+              "%s_FKShoulderGBL" %(self.m_baseName),
+              self.m_shoulderGBLCtrl
+              )
            rc.addToLayer(self.m_sceneData, "mainCtrl", gimbalCtrls)      
            self.m_isShoulder = True
            cmds.parent(self.m_shoulderCtrl+"_0", self.m_group, r=1)
@@ -141,7 +146,8 @@ class FKArmRig:
             )
        rc.addToLayer(self.m_sceneData, "mainCtrl", [self.m_stretchCtrl, self.m_elbowCtrl])
        #Add to controls
-       self.m_allControls = self.m_allControls + [self.m_stretchCtrl, self.m_elbowCtrl]
+       rc.addToControlDict(self.m_allControls, "%s_FKElbowStretch" %(self.m_baseName), self.m_stretchCtrl)
+       rc.addToControlDict(self.m_allControls, "%s_FKElbow" %(self.m_baseName), self.m_elbowCtrl)
        self.m_isElbow = True
 
 
@@ -179,7 +185,7 @@ class FKArmRig:
             False
             )
        # Add to controls
-       self.m_allControls.append(self.m_wristCtrl)
+       rc.addToControlDict(self.m_allControls, "%s_FKWrist" %(self.m_baseName), self.m_wristCtrl)
        rc.addToLayer(self.m_sceneData, "mainCtrl", self.m_wristCtrl)
        self.m_isWrist = True
            

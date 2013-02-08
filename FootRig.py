@@ -13,7 +13,8 @@ class FootRig:
     def __init__(
             self, 
             _sceneData,
-            _name, 
+            _name,
+            _baseName,
             _topJoint,
             _toePivot,
             _heelPivot,
@@ -29,6 +30,7 @@ class FootRig:
             ):
         self.m_sceneData = _sceneData
         self.m_name = _name
+        self.m_baseName = _baseName
         self.m_group = cmds.group(n="%s_GRP" %(self.m_name), em=True)
         self.m_topJoint = _topJoint
         self.m_footToePivot = _toePivot
@@ -41,12 +43,18 @@ class FootRig:
         self.m_parentBIND = _parentBIND
         self.m_parentTwist = _parentTwist
         self.m_blendAttr = _blendAttr
+        self.m_allControls = {}
         if _blendControl:
             self.m_blendControl = _blendControl
         else:
             self.m_blendControl = cmds.circle(
                 n="%s_blend_CTRL" %(self.m_name),
                 )[0]
+            rc.addToControlDict(
+                self.m_allControls,
+                "%s_IKFKBlend" %(self.m_blendControl),
+                self.m_blendControl
+                )
             cmds.parent(self.m_blendControl, self.m_group)
         if not cmds.objExists(
                 "%s.%s" %(self.m_blendControl, self.m_blendAttr
@@ -60,7 +68,13 @@ class FootRig:
                 dv = 0,
                 k=1
                 )
-        
+
+    def getAllControls(self):
+        return self.m_allControls
+
+    def getAnkleJoint(self):
+        return self.m_bindJoints[0]
+
     def getGroup(self):
         return self.m_group
 
@@ -71,6 +85,7 @@ class FootRig:
         self.m_ikFoot = IKFoot.IKFootRig(
             self.m_sceneData,
             "%s_IK" %(self.m_name),
+            self.m_baseName,
             self.m_ikJoints,
             self.m_footToePivot,
             self.m_footHeelPivot,
@@ -88,6 +103,7 @@ class FootRig:
         self.m_fkFoot = FKFoot.FKFootRig(
             self.m_sceneData,
             "%s_FK" %(self.m_name),
+            self.m_baseName,
             self.m_fkJoints,
             self.m_footMain,
             self.m_parentFK
@@ -112,11 +128,17 @@ class FootRig:
         # connect to parent twist
         # Strip constraint
         targetList = cmds.parentConstraint(self.m_parentTwist, q=1, tl=1)
-        cmds.parentConstraint(targetList, self.m_parentTwist, e=True, rm=True)
+        try:
+            cmds.parentConstraint(targetList, self.m_parentTwist, e=True, rm=True)
+        except:
+            print "Warning couldn't remove constraint when creating foot attachment"
         # Add new constraint
         cmds.parentConstraint(self.m_bindJoints[0], self.m_parentTwist, mo=1)
         # Add to sets
         rc.addToSet(self.m_sceneData, "bind", self.m_bindJoints)
+        # Add to controls
+        rc.addDictToControlDict(self.m_allControls, self.m_ikFoot.getAllControls())
+        rc.addDictToControlDict(self.m_allControls, self.m_fkFoot.getAllControls())
 
     def connectBind(self):
         #Create opposite node to blend
@@ -148,6 +170,8 @@ class FootRig:
         
     def duplicateJoints(self, _topJoint, _tagName):
          dupJoints = cmds.duplicate(_topJoint, rc=True)
+         if cmds.listRelatives(dupJoints[0], p=True):
+            cmds.parent(dupJoints[0], w=True)
          i = 0
          for name in [
                  "%s_%s_ankle_JNT" %(self.m_name, _tagName),

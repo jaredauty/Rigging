@@ -24,6 +24,7 @@ class ArmRig:
             _sceneData,
             _joints,
             _name,
+            _baseName,
             _twistAxis="y",
             _rigWrist=True,
             _blendControl=False
@@ -37,6 +38,7 @@ class ArmRig:
             rc.stripAttr(joint, "blendParent2")
 
         self.m_name = _name
+        self.m_baseName = _baseName
         self.m_group = "%s_GRP" %(self.m_name)
         if not cmds.objExists(self.m_group):
             self.m_group = cmds.group(n=self.m_group, em=True)
@@ -45,12 +47,12 @@ class ArmRig:
         self.m_rigWrist = _rigWrist
         self.m_blendControl = _blendControl
         self.m_isMirrored = self.checkMirroring()
-        self.m_allControls = []
+        self.m_allControls = {}
         if not self.m_blendControl:
             self.m_blendControl = cmds.circle(n=self.m_name+"_IKFKBlend_CTRL")[0]
             cmds.parent(self.m_blendControl, self.m_group)
             rc.addToLayer(self.m_sceneData, "mainCtrl", self.m_blendControl)	
-            self.m_allControls.append(self.m_blendControl)
+            rc.addToControlDict(self.m_allControls, "%s_IKFKBlend" %(self.m_baseName), self.m_blendControl)
         self.m_isGenerated = False
         
         # stretch chain parameters
@@ -86,6 +88,9 @@ class ArmRig:
             self.m_numLowerJoints = len(_joints)
         else:
             self.m_numLowerJoints = _numJoints
+
+    def getGroup(self):
+        return self.m_group
 
     def getAllControls(self):
         return self.m_allControls
@@ -145,7 +150,7 @@ class ArmRig:
         cmds.parent(shoulderGRPs[-1], self.m_group)
         # -- Setup FK rig -- #
         tmpList = self.m_fkJoints.getJointList()
-        self.m_fkRig = fk.FKArmRig(self.m_sceneData, tmpList, self.m_name+"_FK")
+        self.m_fkRig = fk.FKArmRig(self.m_sceneData, tmpList, self.m_name+"_FK", self.m_baseName)
         self.m_fkRig.generate()
         cmds.parent(self.m_fkRig.m_group, self.m_group)
         cmds.parentConstraint(
@@ -159,6 +164,7 @@ class ArmRig:
             self.m_sceneData,
             tmpList, 
             self.m_name+"_IK",
+            self.m_baseName,
             self.m_isMirrored,
             self.m_twistAxis
             )
@@ -175,6 +181,7 @@ class ArmRig:
             self.m_sceneData,
             tmpList, 
             self.m_name+"_BIND",
+            self.m_baseName,
             self.m_blendControl,
             self.m_numUpperControls,
             self.m_numLowerControls,
@@ -193,7 +200,11 @@ class ArmRig:
             self.m_bindRig.getMainTransform(),
             mo=True
             )
-        
+        # rig the blend control for aestethics
+        if self.m_rigWrist:
+            self.rigBlendControl(self.m_bindRig.getWristCtrl())
+
+
         # -- Connect up rigs -- #
         try:
             tmp = self.m_blendControl
@@ -206,11 +217,14 @@ class ArmRig:
         cmds.cycleCheck(e=True)
         
         # Add all controls
-        self.m_allControls.append(self.m_shoulderLocator)
-        self.m_allControls = self.m_allControls + \
-            self.m_fkRig.getAllControls() + \
-            self.m_ikRig.getAllControls() +  \
-            self.m_bindRig.getAllControls()
+        rc.addToControlDict(
+            self.m_allControls,
+            "%s_shoulderLocator" %(self.m_baseName),
+            self.m_shoulderLocator
+            )
+        rc.addDictToControlDict(self.m_allControls, self.m_fkRig.getAllControls())
+        rc.addDictToControlDict(self.m_allControls, self.m_ikRig.getAllControls())
+        rc.addDictToControlDict(self.m_allControls, self.m_bindRig.getAllControls())
 
         self.m_isGenerated = True
         
@@ -251,6 +265,8 @@ class ArmRig:
         
     def duplicateJoints(self, _joints, _postFix):
         newJoints = cmds.duplicate(_joints.m_shoulder, rc=1)
+        if cmds.listRelatives(newJoints[0], p=True):
+            cmds.parent(newJoints[0], w=True)
         for i in range(0, len(_joints)):
             jointNameEnd = _joints[i].find("_")
             newName = self.m_name+"_"+_postFix+"_"+\
@@ -344,6 +360,33 @@ class ArmRig:
 
         # Fix wrist rotations
         self.m_bindRig.aimWrist(self.m_ikRig.getIKControl(), [self.m_blendAttr, self.m_blendOppAttr])
+
+    def rigBlendControl(self, _parent):
+        # Move and parent blend control
+        rc.orientControl(self.m_blendControl, _parent)
+        group = rg.addGroup(self.m_blendControl, "%s_0" %(self.m_blendControl))
+        moveValue = -2
+        if self.m_isMirrored:
+            moveValue *= -1
+        cmds.setAttr("%s.t%s" %(self.m_blendControl, self.m_twistAxis), moveValue)
+        cmds.parentConstraint(_parent, group, mo=1)
+        rc.lockAttrs(
+            self.m_blendControl, 
+            [
+                "tx", 
+                "ty",
+                "tz", 
+                "rx", 
+                "ry", 
+                "rz", 
+                "sx", 
+                "sy", 
+                "sz", 
+                "visibility"
+            ],
+            True,
+            True
+            )
 
 
 

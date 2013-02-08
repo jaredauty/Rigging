@@ -11,6 +11,7 @@ class IKFootRig:
             self,
             _sceneData, 
             _name,
+            _baseName,
             _joints,
             _toePivot,
             _heelPivot,
@@ -21,6 +22,7 @@ class IKFootRig:
             ):
         self.m_sceneData = _sceneData
         self.m_name = _name
+        self.m_baseName = _baseName
         self.m_group = cmds.group(n="%s_GRP" %(self.m_name), em=True)
         self.m_joints = _joints
         jointGroup = rg.addGroup(self.m_joints[0], "%s_0" %(self.m_joints[0]))
@@ -31,6 +33,10 @@ class IKFootRig:
         self.m_outsidePivotLoc = _outsidePivot
         self.m_footMainLoc = _footMain
         self.m_ankleIK = _ankleIK
+        self.m_allControls = {}
+
+    def getAllControls(self):
+        return self.m_allControls
 
     def getGroup(self):
         return self.m_group
@@ -40,21 +46,51 @@ class IKFootRig:
         self.m_heelRoll = cmds.spaceLocator(
             n="%s_heelRoll_CTRL" %(self.m_name)
             )[0]
+        rc.addToControlDict(
+            self.m_allControls,
+            "%s_heelRoll" %(self.m_baseName),
+            self.m_heelRoll
+            )
         self.m_insideRoll = cmds.spaceLocator(
             n="%s_insideRoll_CTRL" %(self.m_name)
             )[0]
+        rc.addToControlDict(
+            self.m_allControls,
+            "%s_insideRoll" %(self.m_baseName),
+            self.m_insideRoll
+            )
         self.m_outsideRoll = cmds.spaceLocator(
             n="%s_outsideRoll_CTRL" %(self.m_name)
             )[0]
+        rc.addToControlDict(
+            self.m_allControls,
+            "%s_outsideRoll" %(self.m_baseName),
+            self.m_outsideRoll
+            )
         self.m_toeRoll = cmds.spaceLocator(
             n="%s_toeRoll_CTRL" %(self.m_name)
             )[0]
+        rc.addToControlDict(
+            self.m_allControls,
+            "%s_toeRoll" %(self.m_baseName),
+            self.m_toeRoll
+            )
         self.m_ballRoll = cmds.spaceLocator(
             n="%s_ballRoll_CTRL" %(self.m_name)
             )[0]
+        rc.addToControlDict(
+            self.m_allControls,
+            "%s_ballRoll" %(self.m_baseName),
+            self.m_ballRoll
+            )
         self.m_toeFlap = cmds.spaceLocator(
             n="%s_toeFlap_CTRL" %(self.m_name)
             )[0]
+        rc.addToControlDict(
+            self.m_allControls,
+            "%s_toeFlap" %(self.m_baseName),
+            self.m_toeFlap
+            )
         rc.addToLayer(
             self.m_sceneData,
             "detailCtrl",
@@ -71,6 +107,11 @@ class IKFootRig:
             n="%s_main_CTRL" %(self.m_name),
             nr=(1, 0, 0)
             )[0]
+        rc.addToControlDict(
+            self.m_allControls,
+            "%s_mainCtrl" %(self.m_baseName),
+            self.m_mainCtrl
+            )
         rc.addToLayer(self.m_sceneData, "mainCtrl", self.m_mainCtrl)
         rc.orientControl(self.m_mainCtrl, self.m_footMainLoc)
         cmds.parent(self.m_mainCtrl, self.m_group)

@@ -477,4 +477,23 @@ def getJointChain(_topJoint):
     jointList.reverse()
     return jointList
 
+def addToControlDict(_dict, _identifier, _control):
+    error.assertStringDict(_dict)
+    error.assertString(_identifier)
+    error.assertString(_control)
+    assert _identifier not in _dict, "%s is already in _dict" %(_identifier)
+    # Check that _control is not already mapped
+    notInDict = True
+    for key, value in _dict.items():
+        if value == _control:
+            inDict = False
+            break
+    assert notInDict, "%s is already in _dict" %(_control)
+    # Actually add to _dict
+    _dict[_identifier] = _control
 
+def addDictToControlDict(_destination, _source):
+    error.assertStringDict(_destination)
+    error.assertStringDict(_source)
+    for key, value in _source.items():
+        addToControlDict(_destination, key, value)
