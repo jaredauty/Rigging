@@ -83,6 +83,8 @@ class IKArmRig:
             sol = "ikRPsolver", 
             see = True
             )[0]
+        # deselect so we don't get errors
+        cmds.select(d=1)
         rc.addToLayer(self.m_sceneData, "hidden", [self.m_ikHandle])
         cmds.parent(self.m_ikHandle, self.m_wristCtrl)
         self.setupPoleVec()

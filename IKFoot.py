@@ -152,12 +152,16 @@ class IKFootRig:
             ee=self.m_joints[1],
             sol="ikRPsolver"
             )[0]
+        # deselect so we don't get warnings
+        cmds.select(d=1)
         cmds.parent(self.m_footIK, self.m_ballRoll)
         self.m_toeIK = cmds.ikHandle(
             sj=self.m_joints[1],
             ee=self.m_joints[2],
             sol="ikRPsolver"
             )[0]
+        # deselect so we don't get warnings
+        cmds.select(d=1)
         cmds.parent(self.m_toeIK, self.m_toeFlap)
 
         rc.addToLayer(self.m_sceneData, "hidden", [self.m_footIK, self.m_toeIK])

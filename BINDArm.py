@@ -49,6 +49,7 @@ class BINDArmRig:
             )
         self.m_allControls = {}
         self.m_isGenerated = False
+        self.m_elbowTwistJoints = []
 
         # stretch chain parameters
         self.m_numUpperControls = _numUpperControls
@@ -62,12 +63,9 @@ class BINDArmRig:
         cmds.cycleCheck(e=False)
         if self.m_rigWrist:
             self.rigWrist()
+        self.setupElbowTwist()
         self.setupStretch()
-        # if self.m_rigWrist:
-        #     self.aimWrist()
 
-        # Put joints in the right sets
-        rc.addToSet(self.m_sceneData, "bind", self.m_joints.getJointList())
         cmds.cycleCheck(e=True)
         self.m_isGenerated = True
 
@@ -118,13 +116,57 @@ class BINDArmRig:
             self.m_joints.m_wrist, 
             mo=True
             )
+
+    def setupElbowTwist(self):
+        # Create joints
+        cmds.select(d=1)
+        joint1 = cmds.joint(n="%s_midTwist_JNT" %(self.m_name))#, s=[0.1, 0.1, 0.1])
+        cmds.setAttr("%s.radius" %(joint1), 0.15)
+        rc.orientControl(joint1, self.m_joints.m_elbow1)
+        joint2 = cmds.joint(n="%s_midTwistEnd_JNT" %(self.m_name))#, s=[0.1, 0.1, 0.1])
+        cmds.setAttr("%s.radius" %(joint2), 0.15)
+        rc.orientControl(joint2, self.m_joints.m_elbow2)
+        cmds.parent(joint1, self.m_group)
+        self.m_elbowTwistJoints = [joint1, joint2]
+        rc.addToLayer(self.m_sceneData, "ref", self.m_elbowTwistJoints)
+        rc.addToSet(self.m_sceneData, "bind", self.m_elbowTwistJoints[0])
+        # sort out joint orientations
+        tmpLocator = cmds.spaceLocator()[0]
+        cmds.parent(tmpLocator, self.m_joints.m_elbow1, r=1)
+        cmds.setAttr("%s.t%s" %(tmpLocator, self.m_twistAxis), 1)
+        rc.reorientJoints(self.m_elbowTwistJoints, tmpLocator)
+        cmds.delete(tmpLocator)
+        
+
+        # Create control
+        self.m_elbowTwist = cmds.spaceLocator(n="%s_midTwist_CTRL" %(self.m_name))[0]
+        rc.orientControl(self.m_elbowTwist, self.m_elbowTwistJoints[0])
+        cmds.parent(self.m_elbowTwist, self.m_group)
+        groups = rg.add3Groups(self.m_elbowTwist, ["_SDK", "_CONST", "_0"])
+        # Create aim locator
+        self.m_elbowTwistAimLoc = cmds.spaceLocator(n="%s_midTwistAim_LOC" %(self.m_name))[0]
+        cmds.parent(self.m_elbowTwistAimLoc, self.m_elbowTwist, r=1)
+        aimOffset = 1
+        if(self.m_isMirrored):
+            aimOffset *=1
+
+        cmds.setAttr("%s.tx" %(self.m_elbowTwistAimLoc), aimOffset)
+        rc.addToLayer(self.m_sceneData, "hidden", self.m_elbowTwistAimLoc)
+        # Connect up joint
+        cmds.pointConstraint(self.m_elbowTwist, self.m_elbowTwistJoints[0])
+        cmds.parentConstraint(self.m_joints.m_elbow1, groups[1])
+        self.m_twistAimConstraint = cmds.aimConstraint(
+            self.m_elbowTwistAimLoc,
+            self.m_elbowTwistJoints[0],
+            mo=1
+            )
         
     def setupStretch(self):
        #Create the bendy bits 
         self.m_upperStretch = chain.StretchChain(
             self.m_sceneData,
             self.m_joints.m_shoulder, 
-            self.m_joints.m_elbow1, 
+            self.m_elbowTwistJoints[0], #self.m_joints.m_elbow1,#
             self.m_name+"_upperStretch", 
             "%s_upperStretch" %(self.m_baseName),
             self.m_numLowerControls, 
@@ -139,12 +181,13 @@ class BINDArmRig:
         self.m_upperStretch.setAttrHeading("UPPER")
         self.m_upperStretch.setTwistAxis(self.m_twistAxis)
         self.m_upperStretch.setBindJoints(self.m_upperStretchJoints)
+        self.m_upperStretch.setIsParentTwist(False)
         self.m_upperArmGRP = self.m_upperStretch.generate()
         cmds.parent(self.m_upperArmGRP, self.m_group)
  
         self.m_lowerStretch = chain.StretchChain(
             self.m_sceneData,
-            self.m_joints.m_elbow2, 
+            self.m_elbowTwistJoints[1], #self.m_joints.m_elbow1,#
             self.m_joints.m_wrist, 
             self.m_name+"_lowerStretch",
             "%s_lowerStretch" %(self.m_baseName),
@@ -159,18 +202,27 @@ class BINDArmRig:
         self.m_lowerStretch.setAttrHeading("LOWER")
         self.m_lowerStretch.setTwistAxis(self.m_twistAxis)
         self.m_lowerStretch.setBindJoints(self.m_lowerStretchJoints)
+        self.m_lowerStretch.setIsParentTwist(False)
         self.m_lowerArmGRP = self.m_lowerStretch.generate()
         cmds.parent(self.m_lowerArmGRP, self.m_group)
-        # parent lower twist
-        twistControls = self.m_lowerStretch.getTwistControls()
-        cmds.parent(twistControls[0], self.m_upperStretch.getTwistControls()[1])
+        # Sort out twist controls (parenting)
+        lowerTwistControls = self.m_lowerStretch.getTwistControls()
+        upperTwistControls = self.m_upperStretch.getTwistControls()
+        # --- connect up elbow twists
+        cmds.parentConstraint(upperTwistControls[1], "%s_CONST" %(lowerTwistControls[0]))
+        # --- parent elbow twist to bind joint
+        cmds.parentConstraint(self.m_joints.m_elbow1, "%s_CONST" %(upperTwistControls[1]), mo=1)
+        # --- parent wrist twist to bind joint
+        cmds.parentConstraint(self.m_joints.m_wrist, "%s_CONST" %(lowerTwistControls[1]), mo=1)
+        
+        # fix elbow twist
+        cmds.aimConstraint(self.m_twistAimConstraint, e=1, wut="object", wuo=upperTwistControls[1])
+        
         rc.addDictToControlDict(self.m_allControls, self.m_upperStretch.getAllControls())
         rc.addDictToControlDict(self.m_allControls, self.m_lowerStretch.getAllControls())
         # Hide unused twist controls
-        rc.addToLayer(self.m_sceneData, "hidden", twistControls)
-
-        # for control in twistControls:
-        #     cmds.setAttr("%s.visibility" %(control), 0)
+        rc.addToLayer(self.m_sceneData, "detailCtrl", [lowerTwistControls[1]] + upperTwistControls)
+        rc.addToLayer(self.m_sceneData, "hidden", lowerTwistControls[0])
 
     def aimWrist(self, _fkWrist, _blendControlAttrs):
         error.assertType(_fkWrist, ["", u''])
@@ -187,11 +239,19 @@ class BINDArmRig:
             cmds.parent(group, self.m_group)
             rc.orientControl(group, self.m_wristCtrl)
             cmds.pointConstraint(self.m_joints.m_wrist, group, mo=1)
+            # Create up locator
+            wristAimFix = cmds.spaceLocator(n="%s_wristAimFix_LOC" %(self.m_name))[0]
+            rc.addToLayer(self.m_sceneData, "hidden", wristAimFix)
+            cmds.parent(wristAimFix, self.m_joints.m_elbow2, r=1)
+            aimOffset = 1
+            if self.m_isMirrored:
+                aimOffset *= -1
+            cmds.setAttr("%s.t%s" %(wristAimFix, self.m_twistAxis), aimOffset)
             aim = cmds.aimConstraint(
                 self.m_joints.m_elbow2,
                 group,
                 worldUpType = "object",
-                worldUpObject = self.m_lowerStretch.getTwistControls()[0],
+                worldUpObject = wristAimFix,
                 mo = True
                 )[0]
 

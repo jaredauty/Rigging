@@ -41,4 +41,4 @@ class SceneData:
 		elif _layerIdentifier == "detailCtrl":
 			return self.m_detailCtrlLyr
 		else:
-			assert false, "incorrect layer identifier specified!"
+			assert False, "incorrect layer identifier specified!"

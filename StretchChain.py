@@ -29,6 +29,7 @@ class StretchChain:
         self.m_twistAxis = "y"
         self.m_userJoints = False
         self.m_isAutoBend = True
+        self.m_isParentTwist = True
         self.m_allControls = {}
         
         #create null for scale fixing
@@ -59,6 +60,9 @@ class StretchChain:
 
     def setMirroring(self, _isMirrored):
         self.m_isMirrored = _isMirrored
+
+    def setIsParentTwist(self, _isParentTwist):
+        self.m_isParentTwist = _isParentTwist
 
     def getMirroring(self):
         return self.m_isMirrored
@@ -91,6 +95,8 @@ class StretchChain:
         return self.m_allControls
 
     def generate(self):    
+        if self.m_isMirrored:
+            print "mirrored stretch chain"
         self.createJoints()
         self.createControls()
         self.createIK()
@@ -137,7 +143,7 @@ class StretchChain:
         for joint in self.m_bindJoints:
             rc.stripSets(joint)
         #Add all except first and last to bind set
-        for joint in self.m_bindJoints[1:-1]:
+        for joint in self.m_bindJoints[:-1]:
             rc.addToSet(self.m_sceneData, "bind", joint)
 
     def createControls(self):
@@ -255,6 +261,8 @@ class StretchChain:
            ns=numCVs, 
            n = self.m_name + "_IK"
            )
+        # deselect so we don't get warnings
+        cmds.select(d=1)
         self.m_ikCurve = ikResult[2]
         rc.addToLayer(self.m_sceneData, "hidden", self.m_ikCurve)
         newCurveName = self.m_name+"_IK_CURVE"
@@ -452,7 +460,8 @@ class StretchChain:
                     "%s.t%s" %(groups[0], self.m_twistAxis),
                     -1
                     )
-            cmds.parentConstraint(parent, groups[1], mo=1)
+            if self.m_isParentTwist:
+                cmds.parentConstraint(parent, groups[1], mo=1)
             cmds.parent(groups[2], self.m_group)
             rc.lockAttrs(
                 control,
@@ -476,7 +485,6 @@ class StretchChain:
             else:
                 cmds.setAttr("%s.dWorldUpAxis" %(self.m_ikHandle), 4)
         
-
         cmds.connectAttr(
             "%s.worldMatrix[0]" %(self.m_twistControl1),
             "%s.dWorldUpMatrix" %(self.m_ikHandle),
